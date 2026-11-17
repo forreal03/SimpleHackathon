@@ -1,0 +1,52 @@
+# 대회 설정 예시: 트랙 하나, 부문 둘(학생 인턴 / 정직원), GitHub 운영과 인기투표 없이 가중합 기본 점수.
+schema: 2
+kind: event
+extends: profile:example-corp
+
+event:
+  id: corp-hack-2027
+  name: 사내 해커톤 2027
+  venue: 본사 3층 라운지
+
+schedule:
+  recruit: { open: "2027-05-03T09:00:00+09:00", close: "2027-05-14T18:00:00+09:00" }
+  main:
+    start: "2027-05-20T10:00:00+09:00"
+    end: "2027-05-21T18:00:00+09:00"
+    submit_deadline: "2027-05-21T13:00:00+09:00"
+  score_until: "2027-05-21T17:00:00+09:00"
+  results_at: "off"
+
+# 팀원이 모두 학생 인턴이면 인턴 부문, 아니면 정직원 부문(auto: 위에서부터 처음 맞는 부문).
+divisions:
+  intern:
+    name: 학생 인턴
+    when: { field: 고용 형태, eq: 학생 인턴 }
+    team_rule: all_members
+  staff:
+    name: 정직원
+    when: { field: 고용 형태, in: [정직원, 계약직] }
+    team_rule: any_member
+
+tracks:
+  main:
+    teams: ["01-12"]
+    divisions: [intern, staff]
+    division_mode: auto
+    prizes:
+      intern:
+        - { place: 1, teams: 1, label: 인턴상 }
+      staff:
+        - { place: 1, teams: 1, label: 대상 }
+        - { place: 2, teams: 1, label: 최우수상 }
+
+addons:
+  notices: { enabled: true }
+
+# formula가 없으니 최종 점수는 가중합(components 기본값 judge: 1)입니다.
+# 심사위원이 셋 이상이면 가장 높은 점수와 가장 낮은 점수를 하나씩 빼고 평균합니다.
+scoring:
+  judge_aggregate: { method: trimmed_mean, trim: 1 }
+  overrides:
+    - when: { division: intern }
+      tie_break: [crit.idea, judge]

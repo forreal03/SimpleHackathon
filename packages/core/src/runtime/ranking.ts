@@ -1,5 +1,19 @@
 // Ranking with ties, tie_break order and prize assignment (design doc 3.5).
-import type { PrizeAward, RankGroupKey, RankedTeam, TeamScore, TrackPrizes } from "./types.js";
+import type { PrizeAward, PrizeSpec, RankGroupKey, RankedTeam, TeamRef, TeamScore, TrackPrizes } from "./types.js";
+import { hasOwn } from "./util.js";
+
+/**
+ * The rank group of a team: its `rankGroups` values joined with "/", a null division left out.
+ * `[track, division]` gives "hackathon/student", or "hackathon" for a team without a division.
+ */
+export function rankGroupKey(team: TeamRef, rankGroups: readonly RankGroupKey[]): string {
+  const parts: string[] = [];
+  for (const key of rankGroups) {
+    if (key === "track") parts.push(team.track);
+    else if (key === "division" && team.division) parts.push(team.division);
+  }
+  return parts.join("/");
+}
 
 /**
  * Ranks teams inside each rank group: teams with equal values for `rankGroups` are ranked together.
@@ -9,7 +23,34 @@ import type { PrizeAward, RankGroupKey, RankedTeam, TeamScore, TrackPrizes } fro
  * Returns every team once, grouped by `group` and ordered by rank inside each group.
  */
 export function rankTeams(scores: readonly TeamScore[], rankGroups: readonly RankGroupKey[]): RankedTeam[] {
-  throw new Error("not implemented: rankTeams");
+  const groups = new Map<string, TeamScore[]>();
+  for (const score of scores) {
+    const key = rankGroupKey(score, rankGroups);
+    const list = groups.get(key);
+    if (list) list.push(score);
+    else groups.set(key, [score]);
+  }
+  const ranked: RankedTeam[] = [];
+  groups.forEach((list, group) => {
+    // Array.prototype.sort is stable (ES2019), so equal teams keep their input order.
+    const sorted = list.slice().sort(compareScores);
+    let rank = 0;
+    sorted.forEach((team, i) => {
+      if (i === 0 || compareScores(sorted[i - 1]!, team) !== 0) rank = i + 1;
+      ranked.push({ ...team, group, rank });
+    });
+  });
+  return ranked;
+}
+
+/** Negative when `a` ranks above `b`. */
+function compareScores(a: TeamScore, b: TeamScore): number {
+  if (a.score !== b.score) return b.score - a.score;
+  const n = Math.min(a.tieBreak.length, b.tieBreak.length);
+  for (let i = 0; i < n; i++) {
+    if (a.tieBreak[i] !== b.tieBreak[i]) return b.tieBreak[i]! - a.tieBreak[i]!;
+  }
+  return 0;
 }
 
 /**
@@ -22,5 +63,40 @@ export function rankTeams(scores: readonly TeamScore[], rankGroups: readonly Ran
  * Returns one PrizeAward per table row per group, groups in the order they appear in `ranked`.
  */
 export function assignPrizes(ranked: readonly RankedTeam[], prizes: Readonly<Record<string, TrackPrizes>>): PrizeAward[] {
-  throw new Error("not implemented: assignPrizes");
+  const groups = new Map<string, RankedTeam[]>();
+  for (const team of ranked) {
+    const list = groups.get(team.group);
+    if (list) list.push(team);
+    else groups.set(team.group, [team]);
+  }
+  const awards: PrizeAward[] = [];
+  groups.forEach((list, group) => {
+    const teams = list.slice().sort((a, b) => a.rank - b.rank);
+    const first = teams[0]!;
+    let next = 0;
+    for (const row of prizeTable(prizes, first.track, first.division)) {
+      const award: PrizeAward = { group, place: row.place, teams: [], tieExpanded: false };
+      if (row.amount !== undefined) award.amount = row.amount;
+      if (row.label !== undefined) award.label = row.label;
+      const size = Math.floor(row.teams);
+      if (size >= 1 && next < teams.length) {
+        let end = Math.min(next + size, teams.length);
+        while (end < teams.length && teams[end]!.rank === teams[end - 1]!.rank) end++;
+        award.teams = teams.slice(next, end).map((t) => t.id);
+        award.tieExpanded = end - next > size;
+        next = end;
+      }
+      awards.push(award);
+    }
+  });
+  return awards;
+}
+
+/** The table of a group: the track's list, or the entry for the group's division in a per-division map. */
+function prizeTable(prizes: Readonly<Record<string, TrackPrizes>>, track: string, division: string | null): readonly PrizeSpec[] {
+  const entry = hasOwn(prizes, track) ? prizes[track] : undefined;
+  if (!entry) return [];
+  if (Array.isArray(entry)) return entry;
+  const byDivision = entry as Readonly<Record<string, PrizeSpec[]>>;
+  return division !== null && hasOwn(byDivision, division) ? byDivision[division] ?? [] : [];
 }

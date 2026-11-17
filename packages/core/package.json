@@ -10,9 +10,10 @@
     "simple-hackathon": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build-runtime.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/build-runtime.mjs && node scripts/copy-presets.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs"
   },
   "repository": {
     "type": "git",

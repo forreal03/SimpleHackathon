@@ -1,0 +1,17 @@
+# 대학생 대상 신청 질문(학번, 학년, 소속, 재학 상태)과 재학생만 받는 자격 조건.
+# 트랙 preset 뒤에 얹어 씁니다: extends: [preset:standard-2track@1, preset:university-students@1]
+schema: 2
+kind: preset
+version: 1
+
+intake:
+  fields:
+    add:
+      - { key: 학번, type: text, required: true, max: 20, section: 학적 }
+      - { key: 학년, type: single, required: true, options: [1학년, 2학년, 3학년, 4학년 이상], section: 학적 }
+      - { key: 소속, type: text, required: true, max: 50, section: 학적 }
+      - { key: 재학 상태, type: single, required: true, options: [재학, 휴학], section: 학적 }
+  eligibility:
+    append:
+      - when: { field: 재학 상태, eq: 재학 }
+        message: 휴학생은 신청할 수 없습니다.

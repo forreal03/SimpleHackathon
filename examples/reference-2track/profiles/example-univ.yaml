@@ -1,0 +1,23 @@
+# 조직 profile 예시: 대학 학과가 해마다 여는 해커톤. 이름·주소·메일은 모두 가짜입니다.
+# 두 트랙 기본 구성 위에 대학생 신청 질문을 얹고, 조직이 바꾸지 않는 값을 둡니다.
+schema: 2
+kind: profile
+extends: [preset:standard-2track@1, preset:university-students@1]
+
+event:
+  timezone: Asia/Seoul
+  organizers: [예시대학교 컴퓨터공학과, 예시 개발 동아리 연합]
+
+site:
+  logo: assets/logo.svg
+  accent: "#3b6ef5"
+  contact: { email: hackathon@example.ac.kr }
+
+intake:
+  identity:
+    email_domains: [example.ac.kr, gmail.com]
+  consents:
+    - { key: 개인정보, text: "개인정보 수집·이용에 동의합니다", version: v1 }
+
+privacy:
+  retention_days: 30

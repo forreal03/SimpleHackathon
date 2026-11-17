@@ -1,0 +1,23 @@
+# 트랙 하나와 기본 심사 기준(max_total 100). 트랙 이름과 기준은 profile이나 event에서 바꿉니다.
+schema: 2
+kind: preset
+version: 1
+
+tracks:
+  main: { name: 본선, order: 1 }
+
+intake:
+  fields:
+    - { key: 성함, type: text, required: true, max: 50, roster: name, section: 기본 정보 }
+    - { key: 연락처, type: tel, required: true, section: 기본 정보 }
+    - { key: 팀 구성, type: textarea, roster: team_hint, section: 팀 }
+
+scoring:
+  criteria:
+    - { key: idea, name: 아이디어, max: 30 }
+    - key: impl
+      name: 구현
+      children:
+        - { key: done, name: 완성도, max: 20 }
+        - { key: quality, name: 코드 품질, max: 20 }
+    - { key: demo, name: 발표·시연, max: 30 }

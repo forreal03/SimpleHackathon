@@ -1,0 +1,71 @@
+# 대회 설정 예시: reference case(ENDPoinT 2026)와 같은 구조. 값은 모두 가짜입니다.
+# 조직 값은 profile이, 트랙·심사 기준은 preset이 들고 있어서 이번 대회에서 달라지는 것만 적습니다.
+schema: 2
+kind: event
+extends: profile:example-univ
+
+event:
+  id: example-2027
+  name: Example Hackathon 2027
+  venue: 예시관 101호
+
+site:
+  title: Example Hackathon 2027
+  tagline: 하루 동안 만들고 발표하는 학과 해커톤
+
+schedule:
+  recruit: { open: "2027-03-01T08:00:00+09:00", close: "2027-03-20T23:59:59+09:00" }
+  sessions:
+    - { id: kickoff, at: "2027-03-25T19:00:00+09:00", title: "1차 · 팀 발표와 교육", place: 예시관 101호 }
+    - { id: mentoring, at: "2027-04-01T19:00:00+09:00", title: "2차 · 연사와 멘토링" }
+  main:
+    start: "2027-04-03T19:00:00+09:00"
+    end: "2027-04-04T15:00:00+09:00"
+    submit_deadline: "2027-04-04T10:00:00+09:00"
+    grace_min: 5
+  score_until: "2027-04-04T14:25:00+09:00"
+  results_at: "2027-04-04T14:40:00+09:00"
+
+tracks:
+  hackathon:
+    teams: ["01-10"]
+    vote: { from: "2027-04-04T12:12:00+09:00", until: "2027-04-04T12:27:00+09:00" }
+    prizes:
+      - { place: 1, teams: 1, amount: 500000 }
+      - { place: 2, teams: 2, amount: 300000 }
+  assignment:
+    teams: ["11-20"]
+    submit_deadline: "2027-04-04T09:00:00+09:00"
+    vote: { from: "2027-04-04T14:15:00+09:00", until: "2027-04-04T14:25:00+09:00" }
+    prizes:
+      - { place: 1, teams: 1, amount: 200000 }
+
+intake:
+  fields:
+    add:
+      - { key: 희망 트랙, type: single, required: true, options: [해커톤, 구현과제], section: 참가 정보 }
+  consents:
+    add:
+      - { key: 대회 규정, text: "중복 제출 금지 등 대회 규정을 확인했습니다", version: v1 }
+
+addons:
+  popular_vote: { enabled: true, votes_per_voter: 3, self_vote: false }
+  github_ops: { enabled: true }
+
+# 심사 85 : 인기투표 15. 인기투표는 트랙 평균 득표의 2배 이상이면 15점입니다(design doc 3.4).
+scoring:
+  formula: "0.85 * judge + 15 * sqrt(min(1, votes / (2 * avg_votes)))"
+  tie_break: [judge, crit.arch]
+
+submit:
+  team_max_gb: 6
+  kinds:
+    slides: { name: 발표 자료, max_mb: 300, ext: [pdf, pptx, key, mp4, zip] }
+    program: { name: 프로그램, max_mb: 1024, ext: [zip, 7z, apk, exe, jar] }
+  repo_link: required
+
+# 아래는 운영진만 쓰는 값이라 event.json에 들어가지 않습니다.
+github: { org: example-hackathon-org, team_name: "team{team_no}", team_no_pad: 2 }
+roster: { source: google_sheets, spreadsheet: "https://docs.google.com/spreadsheets/d/<id>/edit" }
+repo: { visibility: private, readme_required_sections: [서비스 링크, 기술 스택] }
+reviewers: { expires_at: "2027-04-30T23:59:59+09:00" }

@@ -1,0 +1,24 @@
+# 조직 profile 예시: 회사가 사내에서 여는 해커톤. 이름·메일은 모두 가짜입니다.
+schema: 2
+kind: profile
+extends: [preset:single-track@1, preset:company-internal@1]
+
+event:
+  timezone: Asia/Seoul
+  organizers: [예시주식회사 개발문화팀]
+
+site:
+  accent: "#0f766e"
+  contact: { email: hack@example.com }
+
+intake:
+  identity:
+    email_domains: [example.com]
+  fields:
+    add:
+      - { key: 고용 형태, type: single, required: true, options: [정직원, 계약직, 학생 인턴], section: 소속 }
+  consents:
+    - { key: 개인정보, text: "사내 행사 운영을 위한 개인정보 이용에 동의합니다", version: v1 }
+
+privacy:
+  retention_days: 14

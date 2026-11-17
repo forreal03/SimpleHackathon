@@ -1,0 +1,358 @@
+{
+  "schema": 2,
+  "kit": {
+    "version": "0.1.0"
+  },
+  "config_hash": "528146e96a9a8c28",
+  "event": {
+    "id": "example-2027",
+    "name": "Example Hackathon 2027",
+    "timezone": "Asia/Seoul",
+    "locale": "ko",
+    "venue": "예시관 101호",
+    "organizers": [
+      "예시대학교 컴퓨터공학과",
+      "예시 개발 동아리 연합"
+    ]
+  },
+  "site": {
+    "title": "Example Hackathon 2027",
+    "tagline": "하루 동안 만들고 발표하는 학과 해커톤",
+    "logo": "assets/logo.svg",
+    "accent": "#3b6ef5",
+    "links": [],
+    "contact": {
+      "email": "hackathon@example.ac.kr"
+    }
+  },
+  "schedule": {
+    "recruit": {
+      "open": "2027-03-01T08:00:00+09:00",
+      "close": "2027-03-20T23:59:59+09:00"
+    },
+    "sessions": [
+      {
+        "id": "kickoff",
+        "at": "2027-03-25T19:00:00+09:00",
+        "title": "1차 · 팀 발표와 교육",
+        "place": "예시관 101호"
+      },
+      {
+        "id": "mentoring",
+        "at": "2027-04-01T19:00:00+09:00",
+        "title": "2차 · 연사와 멘토링"
+      }
+    ],
+    "main": {
+      "start": "2027-04-03T19:00:00+09:00",
+      "end": "2027-04-04T15:00:00+09:00",
+      "submit_deadline": "2027-04-04T10:00:00+09:00",
+      "grace_min": 5
+    },
+    "score_until": "2027-04-04T14:25:00+09:00",
+    "results_at": "2027-04-04T14:40:00+09:00"
+  },
+  "tracks": {
+    "hackathon": {
+      "id": "H",
+      "name": "해커톤",
+      "aliases": [],
+      "teams": [
+        "01-10"
+      ],
+      "order": 1,
+      "divisions": [],
+      "division_mode": "declared",
+      "vote": {
+        "from": "2027-04-04T12:12:00+09:00",
+        "until": "2027-04-04T12:27:00+09:00"
+      },
+      "prizes": [
+        {
+          "place": 1,
+          "teams": 1,
+          "amount": 500000
+        },
+        {
+          "place": 2,
+          "teams": 2,
+          "amount": 300000
+        }
+      ]
+    },
+    "assignment": {
+      "id": "A",
+      "name": "구현과제",
+      "aliases": [],
+      "teams": [
+        "11-20"
+      ],
+      "order": 2,
+      "divisions": [],
+      "division_mode": "declared",
+      "vote": {
+        "from": "2027-04-04T14:15:00+09:00",
+        "until": "2027-04-04T14:25:00+09:00"
+      },
+      "prizes": [
+        {
+          "place": 1,
+          "teams": 1,
+          "amount": 200000
+        }
+      ],
+      "submit_deadline": "2027-04-04T09:00:00+09:00"
+    }
+  },
+  "divisions": {},
+  "intake": {
+    "identity": {
+      "google_login": "required",
+      "one_per_account": true,
+      "email_domains": [
+        "example.ac.kr",
+        "gmail.com"
+      ],
+      "github": {
+        "required": true,
+        "verify": "format"
+      }
+    },
+    "eligibility": [
+      {
+        "when": {
+          "field": "재학 상태",
+          "eq": "재학"
+        },
+        "message": "휴학생은 신청할 수 없습니다."
+      }
+    ],
+    "fields": [
+      {
+        "key": "성함",
+        "type": "text",
+        "required": true,
+        "max": 50,
+        "section": "기본 정보",
+        "roster": "name"
+      },
+      {
+        "key": "연락처",
+        "type": "tel",
+        "required": true,
+        "section": "기본 정보"
+      },
+      {
+        "key": "GitHub 아이디",
+        "type": "github",
+        "required": true,
+        "section": "GitHub",
+        "roster": "github_login"
+      },
+      {
+        "key": "팀 보유 여부 및 팀원",
+        "type": "textarea",
+        "required": true,
+        "section": "팀",
+        "roster": "team_hint"
+      },
+      {
+        "key": "학번",
+        "type": "text",
+        "required": true,
+        "max": 20,
+        "section": "학적"
+      },
+      {
+        "key": "학년",
+        "type": "single",
+        "required": true,
+        "options": [
+          "1학년",
+          "2학년",
+          "3학년",
+          "4학년 이상"
+        ],
+        "section": "학적"
+      },
+      {
+        "key": "소속",
+        "type": "text",
+        "required": true,
+        "max": 50,
+        "section": "학적"
+      },
+      {
+        "key": "재학 상태",
+        "type": "single",
+        "required": true,
+        "options": [
+          "재학",
+          "휴학"
+        ],
+        "section": "학적"
+      },
+      {
+        "key": "희망 트랙",
+        "type": "single",
+        "required": true,
+        "options": [
+          "해커톤",
+          "구현과제"
+        ],
+        "section": "참가 정보"
+      }
+    ],
+    "consents": [
+      {
+        "key": "개인정보",
+        "text": "개인정보 수집·이용에 동의합니다",
+        "version": "v1"
+      },
+      {
+        "key": "대회 규정",
+        "text": "중복 제출 금지 등 대회 규정을 확인했습니다",
+        "version": "v1"
+      }
+    ]
+  },
+  "scoring": {
+    "criteria": [
+      {
+        "key": "idea",
+        "name": "문제 정의 · 아이디어",
+        "weight": 1,
+        "max": 25
+      },
+      {
+        "key": "done",
+        "name": "완성도",
+        "weight": 1,
+        "max": 25
+      },
+      {
+        "key": "ux",
+        "name": "사용자 경험",
+        "weight": 1,
+        "max": 25
+      },
+      {
+        "key": "arch",
+        "name": "구조적 이해",
+        "weight": 1,
+        "max": 25
+      }
+    ],
+    "inputStep": 0.01,
+    "judgeAggregate": {
+      "method": "mean"
+    },
+    "requireComplete": true,
+    "components": {
+      "judge": 1
+    },
+    "popularNormalize": {
+      "method": "share_of_max"
+    },
+    "formula": {
+      "source": "0.85 * judge + 15 * sqrt(min(1, votes / (2 * avg_votes)))",
+      "ast": {
+        "k": "b",
+        "o": "+",
+        "a": {
+          "k": "b",
+          "o": "*",
+          "a": {
+            "k": "n",
+            "v": 0.85
+          },
+          "b": {
+            "k": "v",
+            "n": "judge"
+          }
+        },
+        "b": {
+          "k": "b",
+          "o": "*",
+          "a": {
+            "k": "n",
+            "v": 15
+          },
+          "b": {
+            "k": "c",
+            "f": "sqrt",
+            "a": [
+              {
+                "k": "c",
+                "f": "min",
+                "a": [
+                  {
+                    "k": "n",
+                    "v": 1
+                  },
+                  {
+                    "k": "b",
+                    "o": "/",
+                    "a": {
+                      "k": "v",
+                      "n": "votes"
+                    },
+                    "b": {
+                      "k": "b",
+                      "o": "*",
+                      "a": {
+                        "k": "n",
+                        "v": 2
+                      },
+                      "b": {
+                        "k": "v",
+                        "n": "avg_votes"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "precision": 2,
+    "tieBreak": [
+      {
+        "source": "judge",
+        "ast": {
+          "k": "v",
+          "n": "judge"
+        }
+      },
+      {
+        "source": "crit.arch",
+        "ast": {
+          "k": "v",
+          "n": "crit.arch"
+        }
+      }
+    ],
+    "rankGroups": [
+      "track",
+      "division"
+    ],
+    "overrides": []
+  },
+  "modules": {
+    "apply": true,
+    "submit": true,
+    "judge": true
+  },
+  "addons": {
+    "popular_vote": {
+      "votes_per_voter": 3,
+      "self_vote": false
+    },
+    "github_ops": {}
+  },
+  "privacy": {
+    "retention_days": 30
+  }
+}

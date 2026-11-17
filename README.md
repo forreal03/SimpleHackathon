@@ -21,6 +21,8 @@
 | --- | --- | --- |
 | [`packages/forms`](packages/forms) | 참가 신청 페이지. ENDPoinT 사이트의 신청 화면을 디자인 그대로 옮겼습니다. GitHub 아이디까지 받고, 서버가 기간·입력을 검사해 구글 시트에 씁니다 | HTML·CSS·JS(빌드 없음), GitHub Pages, Google Apps Script, Google Sheets |
 | [`packages/mcp`](packages/mcp) | MCP 서버 [`simple-hackathon-ops-mcp`](https://www.npmjs.com/package/simple-hackathon-ops-mcp). 팀·repo 생성, 조장 maintainer, 마감 잠금·풀기, 멘토·심사위원 읽기 권한, 앱 설치 요청 판정, 일정 토글 | TypeScript, Node.js 22+, MCP SDK, zod, Octokit, node:sqlite |
+| [`packages/core`](packages/core) | 판정 엔진. 설정 상속·병합·검사(V1–V15), 점수(가중합 기본 + 선택 수식), 순위·상 배분, 부문 판정, `event.json` 생성과 `simple-hackathon check`/`build` CLI. 같은 소스를 Apps Script용 `runtime.gs.js`로도 빌드합니다. 설계는 [`docs/design/core-engines.md`](docs/design/core-engines.md) | TypeScript, zod, yaml, esbuild |
+| [`examples`](examples) | 가짜 데이터 예제 두 개: 두 트랙 reference case(`reference-2track`)와 사내 해커톤(`company-internal`) | YAML |
 | [`config`](config) | 대회 설정 양식, 앱 정책, 팀 README 양식, 환경 변수 목록 | YAML |
 | [`docs`](docs) | 그림과 문서 | |
 
@@ -47,17 +49,19 @@
 
 ```bash
 npm install          # 저장소 루트에서 (npm workspaces)
-npm test             # MCP 66개 + 폼 17개 테스트
+npm test             # core 193개 + MCP 66개 + 폼 17개 테스트
 npm run typecheck
 npm run build
-npm run smoke        # 빌드된 MCP 서버를 실제 MCP 클라이언트로 띄워 확인
+npm run smoke        # 빌드된 CLI로 예제를 검사·빌드하고, MCP 서버를 실제 MCP 클라이언트로 띄워 확인
 ```
 
 ```
 .
 ├── packages/
+│   ├── core/       판정 엔진과 simple-hackathon CLI (설정 검사·빌드, 점수·순위·부문)
 │   ├── mcp/        MCP 서버 (npm: simple-hackathon-ops-mcp)
 │   └── forms/      신청 페이지: site/ (GitHub Pages) + apps-script/ (Apps Script)
+├── examples/       설정 예제 (profile + event, 값은 가짜)
 ├── config/         설정 양식 (event.example.yaml, app-policy.yaml, …)
 ├── docs/           그림
 └── workspace/      내 대회 설정과 기록 (git 제외)

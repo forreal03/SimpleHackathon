@@ -1,0 +1,260 @@
+{
+  "schema": 2,
+  "kit": {
+    "version": "0.1.0"
+  },
+  "config_hash": "b2f4322bb2bda2ab",
+  "event": {
+    "id": "corp-hack-2027",
+    "name": "사내 해커톤 2027",
+    "timezone": "Asia/Seoul",
+    "locale": "ko",
+    "venue": "본사 3층 라운지",
+    "organizers": [
+      "예시주식회사 개발문화팀"
+    ]
+  },
+  "site": {
+    "accent": "#0f766e",
+    "links": [],
+    "contact": {
+      "email": "hack@example.com"
+    }
+  },
+  "schedule": {
+    "recruit": {
+      "open": "2027-05-03T09:00:00+09:00",
+      "close": "2027-05-14T18:00:00+09:00"
+    },
+    "sessions": [],
+    "main": {
+      "start": "2027-05-20T10:00:00+09:00",
+      "end": "2027-05-21T18:00:00+09:00",
+      "submit_deadline": "2027-05-21T13:00:00+09:00"
+    },
+    "score_until": "2027-05-21T17:00:00+09:00",
+    "results_at": "off"
+  },
+  "tracks": {
+    "main": {
+      "name": "본선",
+      "aliases": [],
+      "teams": [
+        "01-12"
+      ],
+      "order": 1,
+      "divisions": [
+        "intern",
+        "staff"
+      ],
+      "division_mode": "auto",
+      "prizes": {
+        "intern": [
+          {
+            "place": 1,
+            "teams": 1,
+            "label": "인턴상"
+          }
+        ],
+        "staff": [
+          {
+            "place": 1,
+            "teams": 1,
+            "label": "대상"
+          },
+          {
+            "place": 2,
+            "teams": 1,
+            "label": "최우수상"
+          }
+        ]
+      }
+    }
+  },
+  "divisions": {
+    "intern": {
+      "name": "학생 인턴",
+      "when": {
+        "field": "고용 형태",
+        "eq": "학생 인턴"
+      },
+      "teamRule": "all_members"
+    },
+    "staff": {
+      "name": "정직원",
+      "when": {
+        "field": "고용 형태",
+        "in": [
+          "정직원",
+          "계약직"
+        ]
+      },
+      "teamRule": "any_member"
+    }
+  },
+  "intake": {
+    "identity": {
+      "google_login": "required",
+      "one_per_account": true,
+      "email_domains": [
+        "example.com"
+      ],
+      "github": {
+        "required": false,
+        "verify": "format"
+      }
+    },
+    "eligibility": [],
+    "fields": [
+      {
+        "key": "성함",
+        "type": "text",
+        "required": true,
+        "max": 50,
+        "section": "기본 정보",
+        "roster": "name"
+      },
+      {
+        "key": "연락처",
+        "type": "tel",
+        "required": true,
+        "section": "기본 정보"
+      },
+      {
+        "key": "팀 구성",
+        "type": "textarea",
+        "required": false,
+        "section": "팀",
+        "roster": "team_hint"
+      },
+      {
+        "key": "사번",
+        "type": "text",
+        "required": true,
+        "max": 20,
+        "section": "소속"
+      },
+      {
+        "key": "부서",
+        "type": "text",
+        "required": true,
+        "max": 50,
+        "section": "소속"
+      },
+      {
+        "key": "고용 형태",
+        "type": "single",
+        "required": true,
+        "options": [
+          "정직원",
+          "계약직",
+          "학생 인턴"
+        ],
+        "section": "소속"
+      }
+    ],
+    "consents": [
+      {
+        "key": "개인정보",
+        "text": "사내 행사 운영을 위한 개인정보 이용에 동의합니다",
+        "version": "v1"
+      }
+    ]
+  },
+  "scoring": {
+    "criteria": [
+      {
+        "key": "idea",
+        "name": "아이디어",
+        "weight": 1,
+        "max": 30
+      },
+      {
+        "key": "impl",
+        "name": "구현",
+        "weight": 1,
+        "children": [
+          {
+            "key": "done",
+            "name": "완성도",
+            "weight": 1,
+            "max": 20
+          },
+          {
+            "key": "quality",
+            "name": "코드 품질",
+            "weight": 1,
+            "max": 20
+          }
+        ]
+      },
+      {
+        "key": "demo",
+        "name": "발표·시연",
+        "weight": 1,
+        "max": 30
+      }
+    ],
+    "inputStep": 0.01,
+    "judgeAggregate": {
+      "method": "trimmed_mean",
+      "trim": 1
+    },
+    "requireComplete": true,
+    "components": {
+      "judge": 1
+    },
+    "popularNormalize": {
+      "method": "share_of_max"
+    },
+    "formula": null,
+    "precision": 2,
+    "tieBreak": [
+      {
+        "source": "judge",
+        "ast": {
+          "k": "v",
+          "n": "judge"
+        }
+      }
+    ],
+    "rankGroups": [
+      "track",
+      "division"
+    ],
+    "overrides": [
+      {
+        "when": {
+          "division": "intern"
+        },
+        "tieBreak": [
+          {
+            "source": "crit.idea",
+            "ast": {
+              "k": "v",
+              "n": "crit.idea"
+            }
+          },
+          {
+            "source": "judge",
+            "ast": {
+              "k": "v",
+              "n": "judge"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "modules": {
+    "apply": true,
+    "submit": true,
+    "judge": true
+  },
+  "addons": {
+    "notices": {}
+  },
+  "privacy": {
+    "retention_days": 14
+  }
+}

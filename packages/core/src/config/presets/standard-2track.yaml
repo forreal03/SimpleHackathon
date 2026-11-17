@@ -1,0 +1,25 @@
+# 두 트랙(해커톤 + 구현과제)과 심사 4문항(25점씩, max_total 100)으로 된 기본 구성.
+# extends: preset:standard-2track@1 로 받고, 팀 번호·투표 창·상금표는 event에서 채웁니다.
+schema: 2
+kind: preset
+version: 1
+
+tracks:
+  hackathon: { id: H, name: 해커톤, order: 1 }
+  assignment: { id: A, name: 구현과제, order: 2 }
+
+intake:
+  identity:
+    github: { required: true, verify: format }
+  fields:
+    - { key: 성함, type: text, required: true, max: 50, roster: name, section: 기본 정보 }
+    - { key: 연락처, type: tel, required: true, section: 기본 정보 }
+    - { key: GitHub 아이디, type: github, required: true, roster: github_login, section: GitHub }
+    - { key: 팀 보유 여부 및 팀원, type: textarea, required: true, roster: team_hint, section: 팀 }
+
+scoring:
+  criteria:
+    - { key: idea, name: "문제 정의 · 아이디어", max: 25 }
+    - { key: done, name: 완성도, max: 25 }
+    - { key: ux, name: 사용자 경험, max: 25 }
+    - { key: arch, name: 구조적 이해, max: 25 }

@@ -151,7 +151,7 @@ scoring:
   formula: null                    # 문자열이면 이 식이 최종 점수
   precision: 2                     # 최종 점수·tie_break 비교 자릿수
   tie_break: [judge]               # 식 목록. 앞에서부터 큰 쪽이 앞
-  rank_groups: [track, division]   # 순위를 따로 매기는 묶음
+  rank_groups: [track, division]   # 순위를 따로 매기는 묶음. track은 꼭 들어갑니다(상금표가 트랙마다 있음)
   overrides:                       # 트랙·부문별 덮어쓰기 (뒤에 적은 것이 이김)
     - when: { track: assignment }
       criteria: [ ... ]
@@ -161,11 +161,11 @@ scoring:
 
 **가중합이 기본입니다.** "가중치를 각 점수에 곱해서 더한다"를 모든 층에 그대로 적용합니다.
 
-- 리프의 점수: 심사위원이 넣은 값 `x` (0 이상 `max` 이하, `input_step` 단위로 반올림).
+- 리프의 점수: 심사위원이 넣은 값 `x` (0 이상 `max` 이하, `input_step` 단위로 반올림). 범위를 벗어난 값은 0이나 `max`로 맞추고, 숫자가 아닌 값은 넣지 않은 것으로 봅니다. 한 심사위원이 한 팀에 낸 점수표가 여럿이면 마지막 것만 셉니다.
 - 부모의 점수: `points(parent) = Σ child.weight × points(child)`.
 - 심사위원 한 명의 총점: `judge_total = Σ top.weight × points(top)` (최상위 항목들의 가중합).
 - 기준의 만점: 같은 식에 모든 리프를 `max`로 넣은 값. `max_total`이라고 부르고 검사 결과(`event:check`)에 보여 줍니다. 예: 25점 문항 4개, weight 생략이면 `max_total = 100`.
-- 집계에 넣을 심사위원: `require_complete`가 참이면 그 팀의 리프를 모두 채운 심사위원만.
+- 집계에 넣을 심사위원: `require_complete`가 참이면 그 팀의 리프를 모두 채운 심사위원만. 거짓이면 리프를 하나 이상 채운 심사위원 모두이고, 빈 리프는 0점입니다.
 - 팀의 심사 점수 `judge`(= J): 집계 대상 심사위원들의 `judge_total`을 `judge_aggregate`로 모은 값.
   - `mean`: 산술 평균.
   - `median`: 중앙값(짝수 개면 가운데 두 값의 평균).
@@ -253,7 +253,8 @@ Cond := {}                                  # 항상 참
 | `domain_in` | 도메인 목록 | 이메일의 도메인이 목록에 있다 |
 
 - `field`는 신청서 질문의 `key`입니다. 특별한 이름 두 개: `email`(구글 토큰에서 온 확인된 이메일), `email_domain`.
-- 여러 개를 고르는 답(`multi`)은 배열입니다. 배열에 `eq`/`in`을 쓰면 "하나라도 해당하면 참", `nin`은 "하나도 해당하지 않으면 참"입니다.
+- 여러 개를 고르는 답(`multi`)은 배열입니다. 배열에 `eq`/`in`을 쓰면 "하나라도 해당하면 참", `nin`은 "하나도 해당하지 않으면 참"입니다. `ne`도 `nin`처럼 하나도 같지 않아야 참이고, 크기 비교·`matches`·`domain_in`은 하나라도 맞으면 참입니다.
+- 답이 없으면(빈 문자열, 빈 배열 포함) `ne`, `nin`, `exists: false`만 참입니다. `eq`/`in`은 값의 글자를 비교하므로 답 "3"과 조건 값 3은 같습니다. `email_domain`은 소문자로 읽습니다.
 - `evaluateCondition(cond, person)`은 `{ ok, failed: [{ path, field, op }] }`를 돌려줍니다. 실패 이유에는 조건 쪽 정보만 담고, 다른 사람의 입력값은 담지 않습니다.
 
 ### 4.2 개인 단위 참가 자격
@@ -376,7 +377,7 @@ intake:
 ### 6.2 상속 해석
 
 - 순서: `extends`의 목록을 앞에서부터 차례로 병합하고, 마지막에 이 파일을 병합합니다. 각 부모도 자기 `extends`를 먼저 해석합니다.
-- `preset:<이름>@<major>`: core에 들어 있는 `src/config/presets/<이름>.yaml`. major가 다르면 오류입니다.
+- `preset:<이름>@<major>`: core에 들어 있는 `src/config/presets/<이름>.yaml`(빌드하면 `dist/config/presets/`로 복사). preset 파일은 머리에 `version: <major>`를 적고, major가 다르면 오류입니다. `schema`, `kind`, `extends`, `version`은 파일을 설명하는 키라서 병합하지 않습니다.
 - `profile:<이름>`: `<home>/profiles/<이름>.yaml`. `<home>`은 `events/`가 들어 있는 폴더(이벤트 파일이 `<home>/events/<id>/event.yaml`에 있다고 가정)이거나 CLI의 `--home`.
 - 상대 경로: 이 파일이 있는 폴더 기준.
 - 깊이 5 초과, 순환, 없는 파일은 오류(V13)입니다.
@@ -409,15 +410,15 @@ intake:
 
 ## 7. 검증 규칙 (`check`)
 
-`checkConfig(resolved, ctx)`는 `diagnostics: [{ id, severity: error | warning | info, path, message }]`를 돌려줍니다. 오류가 하나라도 있으면 빌드하지 않습니다.
+`checkConfig(resolved, ctx)`는 `diagnostics: [{ id, severity: error | warning | info, path, message }]`를 돌려줍니다. 오류가 하나라도 있으면 빌드하지 않습니다. 규칙 밖의 문제는 읽을 때(`loadConfig`) 보고하며 id가 `YAML`(문법), `SCHEMA`(모양·형식), `MERGE`(add/remove/update를 잘못 씀)입니다. V12는 `ctx.files`의 원문을 층마다 다시 읽어 검사합니다.
 
 | id | 규칙 |
 | --- | --- |
 | V1 | 시각에 UTC 오프셋이 있고, 모집 열림 < 모집 닫힘 ≤ 사전 프로그램 ≤ 본 행사 시작 < 제출 마감 ≤ 트랙별 투표 창 ≤ 심사 마감 순서다. |
 | V2 | 트랙의 팀 번호 범위(`"01-10"`, `"07"`)가 서로 겹치지 않는다. |
-| V3 | 기준 key가 트리 전체에서 유일하고, `max > 0`, `weight > 0`, 리프에는 `max`가 있다. `max_total`을 info로 보고한다. |
+| V3 | 기준 key가 트리 전체에서 유일하고, `max > 0`, `weight > 0`, 리프에는 `max`가 있다. key는 수식에서 `crit.<key>`로 읽으므로 영문자·숫자·`_`로 적는다. `max_total`을 info로 보고한다. |
 | V4 | `formula`와 `tie_break`가 컴파일되고, 쓰인 변수가 허용 목록(3.3)에 있다. 인기투표 변수는 `popular_vote`가 켜져 있을 때만 허용한다. |
-| V5 | 순위 묶음마다 상금표의 팀 수 합이 그 묶음의 팀 수를 넘지 않는다(부문이 있으면 경고만). |
+| V5 | 순위 묶음마다 상금표의 팀 수 합이 그 묶음의 팀 수를 넘지 않는다(부문이 있으면 경고만). 부문별 상금표는 트랙에 부문이 있고 `rank_groups`에 `division`이 있을 때만 쓴다. |
 | V6 | 트랙별 투표 창이 서로 겹치지 않고 `order` 순서다(`popular_vote`가 켜졌을 때). |
 | V7 | `privacy.retention_days`가 0 이상이다. |
 | V8 | 비밀로 보이는 문자열(`-----BEGIN ... PRIVATE KEY-----`, `ghp_`, `github_pat_`, `AIza`로 시작하는 키, `"private_key"`)이 설정 파일 원문에 있으면 오류. |
@@ -426,7 +427,7 @@ intake:
 | V12 | locked key 위반. |
 | V13 | `extends` 해석 실패(없는 파일, 순환, 깊이, preset major 불일치). |
 | V14 | module·add-on 의존 관계가 맞고, 모르는 add-on이나 `planned` add-on을 켜지 않았다. |
-| V15 | 트랙이 참조하는 부문이 `divisions`에 있고, 조건이 참조하는 `field`가 질문 key 또는 `email`/`email_domain`이며, `matches` 정규식이 컴파일된다. |
+| V15 | 트랙이 참조하는 부문(부문별 상금표의 key 포함)이 `divisions`에 있고 그 트랙에서 열리며, `scoring.overrides`의 `when`이 있는 트랙·부문을 가리키고, 조건이 참조하는 `field`가 질문 key 또는 `email`/`email_domain`이며, `matches` 정규식이 컴파일된다. |
 
 ---
 
@@ -436,9 +437,10 @@ intake:
 
 `buildEventJson(resolved)`는 사이트와 서버가 읽는 **공개용** JSON을 만듭니다.
 
-- 넣는 것: `schema`, `kit.version`, `event`, `site`, `schedule`, `tracks`(prizes 포함), `divisions`(이름과 조건), `intake`(화면에 그릴 질문, 자격 메시지, 동의 항목), `scoring`(기준 트리, components, 정규화 방식, 수식 문자열과 **AST**, `tie_break` AST, `precision`, `rank_groups`, `overrides`), `modules`, 켜진 `addons`와 공개 옵션, `privacy.retention_days`.
+- 넣는 것: `schema`, `kit.version`, `event`, `site`, `schedule`, `tracks`(prizes 포함), `divisions`(이름과 조건, 팀 규칙), `intake`(화면에 그릴 질문, 자격 메시지, 동의 항목), `scoring`(기준 트리, components, 정규화 방식, 수식 문자열과 **AST**, `tie_break` AST, `precision`, `rank_groups`, `overrides`), `modules`, 켜진 `addons`와 공개 옵션, `privacy.retention_days`.
 - 빼는 것: `roster`(시트 링크), `github`, `repo`, `reviewers`, `app_policy`, 그 밖에 운영진만 알면 되는 값.
-- `config_hash`: 정규화한 JSON의 sha256 앞 16자. 서버가 캐시와 버전 확인에 씁니다.
+- 모양: 섹션은 YAML에 적은 모양(snake_case) 그대로이고, runtime 엔진이 그대로 받는 두 섹션만 runtime 모양입니다. `scoring`은 `ScoringConfig`(camelCase, 기본값을 채우고 수식을 AST로 바꾼 것)라서 `computeTeamScores`·`rankTeams`에, `divisions`는 `{ name, when, teamRule }`이라서 `resolveTeamDivision`에 바로 넘깁니다.
+- `config_hash`: 정규화한 JSON(객체 key를 모든 깊이에서 정렬하고 `config_hash` 자신은 뺀 것)의 sha256 앞 16자. 서버가 캐시와 버전 확인에 씁니다.
 
 ### 8.2 CLI
 

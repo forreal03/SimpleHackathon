@@ -1,0 +1,11 @@
+# 사내 해커톤용 신청 질문(사번, 부서). 회사 메일 도메인은 profile의 intake.identity.email_domains에 적습니다.
+# 트랙 preset 뒤에 얹어 씁니다: extends: [preset:single-track@1, preset:company-internal@1]
+schema: 2
+kind: preset
+version: 1
+
+intake:
+  fields:
+    add:
+      - { key: 사번, type: text, required: true, max: 20, section: 소속 }
+      - { key: 부서, type: text, required: true, max: 50, section: 소속 }
