@@ -52,6 +52,10 @@ function options(variant) {
     metafile: true,
     write: false,
     logLevel: "warning",
+    // A require() or import() whose argument is not a string literal stays a runtime lookup that the bundle
+    // cannot satisfy. esbuild reports one inside node_modules, where all the third-party code is, only at
+    // debug level; raise it to a warning so the check in bundle() fails the build.
+    logOverride: { "unsupported-require-call": "warning", "unsupported-dynamic-import": "warning" },
     ...VARIANTS[variant],
   };
 }
