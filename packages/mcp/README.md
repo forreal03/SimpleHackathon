@@ -38,14 +38,19 @@
 
 상태 저장에 Node 내장 `node:sqlite`를 씁니다(네이티브 빌드 없음). 설치는 npm 패키지로 바로 실행하거나 소스에서 빌드합니다.
 
+npm 패키지는 서버와 서버가 쓰는 라이브러리(MCP SDK, Octokit, zod, yaml, google-auth-library)를 esbuild로 묶은 **파일 하나**(`dist/index.js`)이고, **런타임 의존성이 없습니다**. 그래서 `npx`는 이 패키지의 tarball 하나(약 0.4 MB)만 받고 다른 패키지를 설치하지 않습니다. 번들에 들어간 라이브러리 각각의 라이선스 전문은 `THIRD_PARTY_LICENSES`에, 이름·버전·라이선스 목록은 CycloneDX SBOM(`dist/sbom.cdx.json`)에 있습니다.
+
 ```bash
-# npm 패키지로 (MCP 클라이언트 설정에 command: npx, args: [-y, simple-hackathon-ops-mcp])
-npx -y simple-hackathon-ops-mcp
+# npm 패키지로 (MCP 클라이언트 설정에 command: npx, args: [-y, simple-hackathon-ops-mcp@0.1.0])
+npx -y simple-hackathon-ops-mcp@0.1.0
 
 # 소스에서
 git clone https://github.com/forreal03/SimpleHackathon-ops-mcp.git && cd SimpleHackathon-ops-mcp
-npm install && npm run build      # packages/mcp/dist/index.js
+npm install && npm run build      # packages/mcp/dist/index.js (번들 파일 하나)
 ```
+
+**버전 고정**: MCP 클라이언트 설정에는 `simple-hackathon-ops-mcp@0.1.0`처럼 **정확한 버전**을 적기를 권합니다. 버전을 적지 않으면 npx가 실행할 때 최신 버전을 받아 오므로, 확인하지 않은 새 버전이 대회 중에 그대로 돌 수 있습니다. 새 버전으로 올릴 때는 릴리스 노트를 확인하고 숫자를 바꿉니다.
+번들 안 라이브러리는 설치한 쪽의 `npm audit`에 보이지 않습니다. 그 라이브러리에 보안 권고가 나오면 이 저장소에서 다시 빌드해 새 버전을 냅니다.
 
 **작업 폴더**: 대회 설정과 기록을 둘 폴더를 하나 정해 `HACKATHON_OPS_HOME`으로 지정합니다(예: `~/hackathon-ops`).
 소스에서 쓸 때는 저장소의 `workspace/`(git 제외)를 쓰면 됩니다.
@@ -110,7 +115,7 @@ Claude Desktop (`claude_desktop_config.json`, Windows 예시):
   "mcpServers": {
     "simple-hackathon-ops": {
       "command": "npx",
-      "args": ["-y", "simple-hackathon-ops-mcp"],
+      "args": ["-y", "simple-hackathon-ops-mcp@0.1.0"],
       "env": {
         "HACKATHON_OPS_HOME": "C:\\Users\\me\\hackathon-ops",
         "GITHUB_APP_ID": "123456",
@@ -131,10 +136,11 @@ claude mcp add simple-hackathon-ops --scope user \
   -e GITHUB_APP_ID=123456 \
   -e GITHUB_APP_PRIVATE_KEY_PATH=/path/to/key.pem \
   -e GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json \
-  -- npx -y simple-hackathon-ops-mcp
+  -- npx -y simple-hackathon-ops-mcp@0.1.0
 ```
 
 `--scope user`면 어느 폴더에서 연 세션에서도 쓰입니다(`local`은 그 폴더에서만). 환경 변수 전체는 [config/.env.example](../../config/.env.example)에 있습니다.
+두 예시 모두 버전을 고정해 두었습니다(위 "버전 고정"). 버전을 올릴 때는 이 숫자만 바꿉니다.
 
 ## 대회 설정
 
@@ -238,10 +244,12 @@ Gmail 커넥터가 연결된 클라이언트에서 "앱 요청 확인해줘"라�
 
 ```bash
 # packages/mcp 에서
-npm test          # vitest, GitHub은 메모리 fake로 대체
+npm test          # vitest(src 대상), GitHub은 메모리 fake로 대체
 npm run typecheck
-npm run build
-npm run smoke     # 빌드된 서버를 stdio로 띄워 툴 목록과 오프라인 툴 확인
+npm run build     # 번들 dist/index.js, config/·LICENSE 복사, THIRD_PARTY_LICENSES와 dist/sbom.cdx.json 생성
+npm run smoke     # 빌드된 서버를 stdio로 띄워 툴 목록과 오프라인 툴 확인. 같은 확인을 node_modules가 없는
+                  # 임시 폴더의 패키지 복사본으로 한 번 더 하고, 출판물(의존성 0, 번들 크기, 파일 목록, 라이선스)을 검사
+node scripts/bundle.mjs --compare   # minify 방식별 번들 크기(raw, gzip) 비교
 ```
 
 구조:
@@ -256,8 +264,17 @@ src/
   ops/        읽기 전용 툴과 앱 툴
   state/      대회별 SQLite (plan, 감사 로그, 앱 결정, 요청)
   server.ts   MCP 툴 등록
+scripts/
+  bundle.mjs         src/index.ts → dist/index.js (esbuild, Node 내장 모듈만 밖에 두는 ESM 파일 하나)
+  third-party.mjs    번들의 metafile(build/metafile.json) → THIRD_PARTY_LICENSES, dist/sbom.cdx.json
+  check-package.mjs  출판물 검사: dependencies 없음, 번들 1.6 MB 이하, npm pack 파일 목록, 라이선스 누락, README의 고정 버전
+  smoke.mjs          실제 MCP 클라이언트로 서버 확인(저장소 안, 그리고 격리된 복사본)
+  call.mjs           툴 하나를 불러 결과 출력
 ```
+
+`dist/`, `config/`, `LICENSE`, `THIRD_PARTY_LICENSES`, `build/`는 빌드 결과라 git에 넣지 않습니다.
+라이브러리는 모두 `devDependencies`에 있습니다. 빌드할 때 번들 안으로 들어가므로, 패키지를 설치하는 쪽에는 필요 없습니다.
 
 ## License
 
-MIT
+MIT. 번들에 들어간 라이브러리의 라이선스는 `THIRD_PARTY_LICENSES`에 있습니다.

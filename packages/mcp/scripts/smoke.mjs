@@ -1,6 +1,8 @@
 // Starts the built server over stdio, lists its tools and runs the offline ones against a temp folder.
+// Then does the same with a copy of the package (dist/, config/, package.json, licenses) in a temp folder
+// with no node_modules on the way up, which shows the bundle needs nothing else at runtime.
 // Usage: npm run build && node scripts/smoke.mjs
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,45 +10,101 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const home = mkdtempSync(path.join(tmpdir(), "hackathon-ops-smoke-"));
+// The 0.1.0 tool surface (SPEC 12.4). Change it together with the tools.
+const EXPECTED_TOOLS = 32;
+// The isolated copy gets what npm publishes (scripts/check-package.mjs has the full list) and nothing else.
+const PACKAGE_FILES = ["dist", "config", "package.json", "README.md", "LICENSE", "THIRD_PARTY_LICENSES"];
 
-const transport = new StdioClientTransport({
-  command: process.execPath,
-  args: [path.join(root, "dist", "index.js")],
-  env: { ...process.env, HACKATHON_OPS_HOME: home, GITHUB_TOKEN: "", GITHUB_APP_ID: "" },
-  stderr: "pipe",
-});
-const client = new Client({ name: "smoke", version: "0.0.0" });
+/** Runs the offline checks against `entry` started in `cwd`; returns the result lines and tool names. */
+async function smoke(entry, { cwd, env = process.env, print = () => {} }) {
+  const home = mkdtempSync(path.join(tmpdir(), "hackathon-ops-smoke-"));
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [entry],
+    cwd,
+    env: { ...env, HACKATHON_OPS_HOME: home, GITHUB_TOKEN: "", GITHUB_APP_ID: "" },
+    stderr: "pipe",
+  });
+  let stderr = "";
+  transport.stderr?.on("data", (chunk) => (stderr += chunk));
+  const client = new Client({ name: "smoke", version: "0.0.0" });
+  const call = async (name, args) => {
+    const res = await client.callTool({ name, arguments: args });
+    return { isError: !!res.isError, text: res.content[0]?.text ?? "" };
+  };
+  const lines = [];
+  const log = (line) => {
+    lines.push(line);
+    print(line);
+  };
+  const expect = (ok, what) => {
+    if (!ok) throw new Error(`smoke (${entry}): ${what}\nserver stderr:\n${stderr}`);
+  };
 
-const call = async (name, args) => {
-  const res = await client.callTool({ name, arguments: args });
-  return { isError: !!res.isError, text: res.content[0]?.text ?? "" };
-};
+  try {
+    await client.connect(transport).catch((err) => expect(false, `server did not start (${err.message})`));
+    const { tools } = await client.listTools();
+    log(`tools (${tools.length}): ${tools.map((t) => t.name).join(", ")}`);
+    expect(tools.length === EXPECTED_TOOLS, `expected ${EXPECTED_TOOLS} tools, got ${tools.length}`);
 
+    const init = await call("event_init", { event_id: "smoke-test", org: "some-org" });
+    log(`event_init: ${init.isError ? "ERROR " + init.text : `${JSON.parse(init.text).status}, valid=${JSON.parse(init.text).valid}`}`);
+    expect(!init.isError && JSON.parse(init.text).status === "created", "event_init did not create the event");
+
+    // Fill the placeholder sheet link the way an operator would.
+    const yamlFile = path.join(home, "events", "smoke-test", "event.yaml");
+    writeFileSync(yamlFile, readFileSync(yamlFile, "utf8").replace("<id>", "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"));
+
+    const again = await call("event_init", { event_id: "smoke-test", org: "some-org" });
+    log(`event_init again: ${again.isError ? "ERROR " + again.text : `${JSON.parse(again.text).status}, valid=${JSON.parse(again.text).valid}`}`);
+    expect(!again.isError && JSON.parse(again.text).valid === true, "event_init again did not find a valid event.yaml");
+
+    const audit = await call("audit_query", { event: "smoke-test" });
+    log(`audit_query: ${audit.isError ? "ERROR " + audit.text : `${JSON.parse(audit.text).length} rows`}`);
+    expect(!audit.isError, "audit_query failed");
+
+    const badId = await call("audit_query", { event: "../etc" });
+    log(`path traversal refused: ${badId.isError}`);
+    expect(badId.isError, "audit_query accepted ../etc");
+
+    const noCreds = await call("org_check", { event: "smoke-test" });
+    log(`org_check without credentials: ${noCreds.isError ? noCreds.text.split("\n")[0] : "unexpectedly ok"}`);
+    expect(noCreds.isError, "org_check ran without credentials");
+    // src/index.ts hides this warning (Node 22 and 24) by loading node:sqlite only after its filter is set.
+    // A bundle that hoisted the import would print it.
+    expect(!stderr.includes("SQLite is an experimental feature"), "node:sqlite's ExperimentalWarning reached stderr");
+    return { lines, tools: tools.map((t) => t.name) };
+  } finally {
+    await client.close();
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
+/** A copy of the package in a fresh temp folder. Node looks for packages in every parent's node_modules. */
+function isolatedCopy() {
+  const dir = mkdtempSync(path.join(tmpdir(), "hackathon-ops-isolated-"));
+  for (let d = dir; ; d = path.dirname(d)) {
+    if (existsSync(path.join(d, "node_modules"))) {
+      rmSync(dir, { recursive: true, force: true });
+      throw new Error(`${d} has a node_modules folder, so a copy under ${tmpdir()} is not isolated; set TMPDIR elsewhere`);
+    }
+    if (path.dirname(d) === d) break;
+  }
+  for (const f of PACKAGE_FILES) cpSync(path.join(root, f), path.join(dir, f), { recursive: true });
+  return dir;
+}
+
+const repo = await smoke(path.join(root, "dist", "index.js"), { cwd: root, print: (line) => console.log(line) });
+
+const copy = isolatedCopy();
 try {
-  await client.connect(transport);
-  const { tools } = await client.listTools();
-  console.log(`tools (${tools.length}):`, tools.map((t) => t.name).join(", "));
-
-  const init = await call("event_init", { event_id: "smoke-test", org: "some-org" });
-  console.log("event_init:", init.isError ? "ERROR " + init.text : `${JSON.parse(init.text).status}, valid=${JSON.parse(init.text).valid}`);
-
-  // Fill the placeholder sheet link the way an operator would.
-  const yamlFile = path.join(home, "events", "smoke-test", "event.yaml");
-  writeFileSync(yamlFile, readFileSync(yamlFile, "utf8").replace("<id>", "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"));
-
-  const again = await call("event_init", { event_id: "smoke-test", org: "some-org" });
-  console.log("event_init again:", again.isError ? "ERROR " + again.text : `${JSON.parse(again.text).status}, valid=${JSON.parse(again.text).valid}`);
-
-  const audit = await call("audit_query", { event: "smoke-test" });
-  console.log("audit_query:", audit.isError ? "ERROR " + audit.text : `${JSON.parse(audit.text).length} rows`);
-
-  const badId = await call("audit_query", { event: "../etc" });
-  console.log("path traversal refused:", badId.isError);
-
-  const noCreds = await call("org_check", { event: "smoke-test" });
-  console.log("org_check without credentials:", noCreds.isError ? noCreds.text.split("\n")[0] : "unexpectedly ok");
+  // No module search paths or preloads from this environment either.
+  const { NODE_PATH, NODE_OPTIONS, ...env } = process.env;
+  const isolated = await smoke(path.join(copy, "dist", "index.js"), { cwd: copy, env });
+  if (isolated.lines.join("\n") !== repo.lines.join("\n")) {
+    throw new Error(`the isolated copy behaved differently:\n${isolated.lines.join("\n")}`);
+  }
+  console.log(`isolated copy (no node_modules, only ${PACKAGE_FILES.join(", ")}): same ${isolated.tools.length} tools, same results`);
 } finally {
-  await client.close();
-  rmSync(home, { recursive: true, force: true });
+  rmSync(copy, { recursive: true, force: true });
 }

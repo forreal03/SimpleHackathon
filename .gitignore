@@ -18,3 +18,6 @@ workspace/
 # Build output copied into the npm package
 packages/mcp/config/
 packages/mcp/LICENSE
+packages/mcp/THIRD_PARTY_LICENSES
+# esbuild metafile of the bundle (not published; the license and package checks read it)
+packages/mcp/build/
