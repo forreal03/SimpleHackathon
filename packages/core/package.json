@@ -1,0 +1,35 @@
+{
+  "name": "@simple-hackathon/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Engines shared by the SimpleHackathon kit: config inheritance and checks, scoring, ranking, divisions and the formula language. The runtime part also builds into one Google Apps Script file.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "simple-hackathon": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-runtime.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forreal03/SimpleHackathon-ops-mcp.git",
+    "directory": "packages/core"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

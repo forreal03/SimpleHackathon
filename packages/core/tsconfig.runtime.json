@@ -1,0 +1,10 @@
+// Type-checks src/runtime alone the way Apps Script sees it: ES2019 library, no Node globals.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2019"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/runtime/**/*.ts"]
+}
