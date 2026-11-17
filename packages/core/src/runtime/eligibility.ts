@@ -193,9 +193,27 @@ export function matchesProblem(pattern: unknown): string | null {
   try {
     new RegExp(pattern);
   } catch (e) {
+    // Engines differ on newer group syntax (Node 22 rejects (?i:...), Node 24 accepts it), so
+    // report a group outside the subset the same way whether or not this engine compiles it.
+    if (hasGroupOutsideSubset(pattern)) return GROUP_SUBSET;
     return `정규식을 읽을 수 없습니다: ${(e as Error).message}`;
   }
   return backtrackingProblem(pattern);
+}
+
+const GROUP_SUBSET = "그룹은 (...), (?:...), (?=...), (?!...)만 쓸 수 있습니다.";
+
+/** True when a "(?" group other than (?:, (?= or (?! appears outside escapes and [...] classes. */
+function hasGroupOutsideSubset(pattern: string): boolean {
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") i++;
+    else if (inClass) inClass = ch !== "]";
+    else if (ch === "[") inClass = true;
+    else if (ch === "(" && pattern[i + 1] === "?" && ":=!".indexOf(pattern[i + 2] ?? "") < 0) return true;
+  }
+  return false;
 }
 
 /** Ways of one alternative being read, and of the alternatives before it in its group. */
@@ -237,7 +255,7 @@ function backtrackingProblem(pattern: string): string | null {
     } else if (ch === "(") {
       const special = pattern[i + 1] === "?";
       const kind = pattern[i + 2];
-      if (special && kind !== ":" && kind !== "=" && kind !== "!") return "그룹은 (...), (?:...), (?=...), (?!...)만 쓸 수 있습니다.";
+      if (special && kind !== ":" && kind !== "=" && kind !== "!") return GROUP_SUBSET;
       open.push((cur = { done: 0, before: 1, last: 1 }));
       i += special ? 3 : 1;
     } else if (ch === ")") {
