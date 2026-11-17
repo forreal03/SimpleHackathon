@@ -279,11 +279,13 @@ describe("V7: retention", () => {
 });
 
 describe("V8: secrets", () => {
+  // Built at runtime so this public source file never holds a full token-shaped literal
+  // (secret scanners and push protection would flag it).
   const SECRETS = [
-    "-----BEGIN RSA PRIVATE KEY-----",
-    "token: ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789",
-    "pat: github_pat_11ABCDEFG0123456789_abcdefghijklmnop",
-    "key: AIzaSyA-1234567890abcdefghijklmnopqrstu",
+    "-----BEGIN RSA " + "PRIVATE KEY-----",
+    "token: " + "ghp" + "_" + "aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789",
+    "pat: " + "github" + "_pat_" + "11ABCDEFG0123456789_abcdefghijklmnop",
+    "key: " + "AI" + "za" + "SyA-1234567890abcdefghijklmnopqrstu",
     '{ "private_key": "x" }',
     "private_key: x",
   ];
