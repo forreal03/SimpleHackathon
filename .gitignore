@@ -4,6 +4,9 @@ coverage/
 *.log
 .DS_Store
 
+# Local git worktrees made by Claude Code and its workflows
+.claude/worktrees/
+
 # Credentials — never commit
 .env
 *.pem
