@@ -1,7 +1,7 @@
 // The reference case end to end: examples/reference-2track through load, merge, check and build,
 // then fake judge sheets and votes through the runtime with the scoring config event.json carries.
 import { describe, expect, it } from "vitest";
-import { assignPrizes, rankTeams } from "../src/runtime/ranking.js";
+import { assignPrizes, prizesByTrack, rankTeams } from "../src/runtime/ranking.js";
 import { computeTeamScores } from "../src/runtime/scoring.js";
 import { roundTo } from "../src/runtime/util.js";
 import { REFERENCE_VOTES, buildExample, referenceCase } from "./examples.js";
@@ -56,8 +56,7 @@ describe("reference case: scores (design doc 3.4)", () => {
       ["02", 3, 15],
       ["04", 5, 10.61],
     ]);
-    const prizes = Object.fromEntries(Object.entries(eventJson.tracks).map(([id, t]) => [id, t.prizes]));
-    expect(assignPrizes(ranked, prizes)).toEqual([
+    expect(assignPrizes(ranked, prizesByTrack(eventJson.tracks))).toEqual([
       { group: "hackathon", place: 1, amount: 500000, teams: ["03"], tieExpanded: false },
       { group: "hackathon", place: 2, amount: 300000, teams: ["06", "01", "02"], tieExpanded: true },
       { group: "assignment", place: 1, amount: 200000, teams: ["11", "12", "13", "14", "15", "16", "17", "18", "19", "20"], tieExpanded: true },

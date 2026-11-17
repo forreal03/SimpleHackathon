@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildEventJson } from "../src/build/event-json.js";
 import { checkConfig, type Diagnostic } from "../src/config/check.js";
 import type { SourceFile } from "../src/config/load.js";
 import { merge } from "../src/config/merge.js";
@@ -81,6 +82,35 @@ describe("V1: times", () => {
   it("compares the deadline with score_until when a track has no vote window", () => {
     const found = only("V1", run(merge(SCHEDULE, { tracks: { a: { vote: null } }, schedule: { score_until: "2027-04-04T09:00:00+09:00" } })));
     expect(found.map(([, path]) => path)).toEqual(["schedule.score_until", "schedule.score_until"]);
+  });
+
+  it("keeps ordering across missing times, strictly when a strict link is skipped", () => {
+    const at = (day: string) => `2027-04-${day}T10:00:00+09:00`;
+    const cases: [unknown, string, string][] = [
+      [{ schedule: { recruit: { open: "2027-05-01T10:00:00+09:00" }, main: { start: at("01") } } }, "schedule.main.start", "늦어야 합니다"],
+      [{ schedule: { sessions: [{ id: "k", at: at("10"), title: "k" }], main: { submit_deadline: at("02") } } }, "schedule.main.submit_deadline", "늦어야 합니다"],
+      [{ schedule: { main: { start: at("03") } }, tracks: { a: { vote: { from: at("01"), until: at("02") } } } }, "tracks.a.vote.from", "늦어야 합니다"],
+      [{ schedule: { main: { start: at("03") }, score_until: at("02") } }, "schedule.score_until", "늦어야 합니다"],
+      [{ schedule: { recruit: { close: at("05") }, main: { start: at("05") } } }, "", ""],
+    ];
+    for (const [over, path, words] of cases) {
+      const found = only("V1", run(over));
+      if (path === "") {
+        expect(found, "close = start without sessions is allowed").toEqual([]);
+        continue;
+      }
+      expect(found, path).toHaveLength(1);
+      expect(found[0]![1]).toBe(path);
+      expect(found[0]![2]).toContain(words);
+    }
+  });
+
+  it("refuses days the month does not have instead of rolling them over", () => {
+    expect(only("V1", run({ schedule: { main: { start: "2027-04-31T10:00:00+09:00", submit_deadline: "2027-02-29T10:00:00+09:00" } } }))).toEqual([
+      ["error", "schedule.main.start", "없는 날짜나 시각입니다: 2027-04-31T10:00:00+09:00"],
+      ["error", "schedule.main.submit_deadline", "없는 날짜나 시각입니다: 2027-02-29T10:00:00+09:00"],
+    ]);
+    expect(only("V1", run({ schedule: { main: { start: "2028-02-29T10:00:00+09:00" } } }))).toEqual([]);
   });
 });
 
@@ -168,6 +198,30 @@ describe("V4: formulas", () => {
       ["error", "scoring.overrides[1].tie_break[0]", expect.stringMatching(/"crit\.y"는 쓸 수 없는 변수입니다\..* \(트랙 b에 적용될 때\)$/)],
     ]);
   });
+
+  it("also checks formulas no team reaches, the way build compiles them", () => {
+    const shadowed = { scoring: { formula: "judge +", tie_break: ["crit.zzz"], overrides: [{ when: {}, formula: "judge", tie_break: ["judge"] }] } };
+    expect(only("V4", run(shadowed))).toEqual([
+      ["error", "scoring.formula", "8번째 글자 근처: 식이 끝나기 전에 값(숫자, 변수, 함수, 괄호)이 하나 더 와야 합니다."],
+      ["error", "scoring.tie_break[0]", expect.stringContaining('"crit.zzz"는 쓸 수 없는 변수입니다.')],
+    ]);
+    const unmatched = { divisions: { s: { name: "S" } }, scoring: { overrides: [{ when: { track: "a", division: "s" }, formula: "judge +" }] } };
+    expect(only("V4", run(unmatched))).toEqual([["error", "scoring.overrides[0].formula", expect.stringContaining("식이 끝나기 전에")]]);
+  });
+
+  it("passes exactly the configs that build", () => {
+    const cases: [unknown, boolean][] = [
+      [{ scoring: { formula: "judge +", overrides: [{ when: { track: "a" }, formula: "judge" }] } }, false],
+      [{ divisions: { s: { name: "S" } }, scoring: { overrides: [{ when: { division: "s" }, tie_break: ["nope("] }] } }, false],
+      [{ scoring: { overrides: [{ when: { track: "a" }, criteria: [{ key: "y", name: "Y", max: 5 }], formula: "crit.y" }] } }, true],
+    ];
+    for (const [over, builds] of cases) {
+      const config = resolve(over);
+      expect(checkConfig(config, { files: [] }).some((d) => d.severity === "error"), JSON.stringify(over)).toBe(!builds);
+      if (builds) expect(() => buildEventJson(config)).not.toThrow();
+      else expect(() => buildEventJson(config)).toThrow();
+    }
+  });
 });
 
 describe("V5: prize tables", () => {
@@ -247,8 +301,24 @@ describe("V8: secrets", () => {
     }
   });
 
+  it("also finds other GitHub tokens, Google OAuth client secrets, quoted private_key keys and PGP keys", () => {
+    const lines = [
+      "github: { org: x, token: gho_16C7e42F292c6912E7710c838347Ae178B4a }",
+      "app: ghs_16C7e42F292c6912E7710c838347Ae178B4a",
+      "user: ghu_16C7e42F292c6912E7710c838347Ae178B4a",
+      "refresh: ghr_16C7e42F292c6912E7710c838347Ae178B4a",
+      "oauth: { client_secret: GOCSPX-abcdefghijklmnopqrstuvwx12 }",
+      `repo: { 'private_key': "abc" }`,
+      "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    ];
+    const found = only("V8", run({}, [{ path: "/x/e.yaml", text: lines.join("\n") }]));
+    expect(found.map(([, path]) => path)).toEqual(lines.map((_, i) => `/x/e.yaml:${i + 1}`));
+    for (const [, , message] of found) expect(message).not.toContain("16C7e42F");
+  });
+
   it("leaves ordinary text alone", () => {
-    expect(only("V8", run({}, [{ path: "a.yaml", text: "note: ghp_ tokens never go here\nemail: AIza@example.com\n" }]))).toEqual([]);
+    const text = "note: ghp_ and gho_ tokens never go here\nemail: AIza@example.com\nGOCSPX- is the prefix\nmy_private_key_count: 1\n-----BEGIN PUBLIC KEY-----\n";
+    expect(only("V8", run({}, [{ path: "a.yaml", text }]))).toEqual([]);
   });
 });
 
@@ -285,6 +355,17 @@ describe("V12: locked keys", () => {
     expect(only("V12", run({}, files)).map(([severity, path]) => [severity, path])).toEqual([
       ["error", "intake.identity.google_login"],
       ["error", "reviewers.permission"],
+    ]);
+  });
+
+  it("also checks the merged values, for a config built in memory, and reports a key once", () => {
+    const changed = { intake: { identity: { google_login: "optional", one_per_account: false } }, reviewers: { permission: "admin" } };
+    const found = only("V12", run(changed));
+    expect(found.map(([, path]) => path)).toEqual(["intake.identity.google_login", "intake.identity.one_per_account", "reviewers.permission"]);
+    expect(found[0]![2]).toContain('병합된 설정에서 "optional"로 바꾸려고 했습니다.');
+    const file = { path: "/x/events/e/event.yaml", text: "schema: 2\nkind: event\nintake:\n  identity: { google_login: optional }\n" };
+    expect(only("V12", run({ intake: { identity: { google_login: "optional" } } }, [file])).map(([, path, message]) => [path, message.includes("event.yaml")])).toEqual([
+      ["intake.identity.google_login", true],
     ]);
   });
 });
@@ -338,5 +419,26 @@ describe("V15: references", () => {
       ["divisions.s.when.any[1].not.matches", "정규식을 읽을 수 없습니다"],
       ["intake.eligibility[0].when.field", '조건이 읽는 질문 "재학"가 intake.fields에 없습니다. 질문 key나 email, email_domain을 적어 주세요.'],
     ]);
+  });
+
+  it("refuses patterns a crafted answer could keep busy, and syntax outside the subset", () => {
+    const rule = (matches: string) => ({ when: { field: "성함", matches }, message: "m" });
+    const over = { intake: { eligibility: [rule("^(\\w+\\s?)*$"), rule("^([A-Za-z]+ ?)+$"), rule(".*a.*a.*b"), rule("(?i:kim)"), rule("^[A-Za-z ]{1,50}$")] } };
+    expect(only("V15", run(over))).toEqual([
+      ["error", "intake.eligibility[0].when.matches", expect.stringMatching(/^반복\(\*, \+, \{n,\}\)이 붙은 그룹 안에는/)],
+      ["error", "intake.eligibility[1].when.matches", expect.stringMatching(/^반복\(\*, \+, \{n,\}\)이 붙은 그룹 안에는/)],
+      ["error", "intake.eligibility[2].when.matches", expect.stringMatching(/^반복이 너무 많아/)],
+      ["error", "intake.eligibility[3].when.matches", "그룹은 (...), (?:...), (?=...), (?!...)만 쓸 수 있습니다."],
+    ]);
+  });
+
+  it("warns about an override that matches no track × division", () => {
+    const over = { divisions: { s: { name: "S" }, g: { name: "G" } }, tracks: { a: { divisions: ["g"] } }, scoring: { overrides: [{ when: { division: "s" }, precision: 1 }, { when: { track: "a", division: "g" }, precision: 0 }] } };
+    expect(only("V15", run(over))).toEqual([["warning", "scoring.overrides[0].when", expect.stringContaining("어느 팀에도 쓰이지 않습니다")]]);
+  });
+
+  it("warns that email addresses in a condition become public", () => {
+    const over = { intake: { eligibility: [{ when: { any: [{ field: "email", in: ["a@x.com", "b@y.com"] }, { field: "email", matches: "@example\\.com$" }] }, message: "m" }] } };
+    expect(only("V15", run(over))).toEqual([["warning", "intake.eligibility[0].when.any[0]", expect.stringContaining("공개되는 event.json에 그대로 실립니다")]]);
   });
 });

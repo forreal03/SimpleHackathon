@@ -6,6 +6,7 @@ import type {
   CondOp,
   CondResult,
   DivisionDef,
+  DivisionMode,
   DivisionResult,
   EligibilityResult,
   EligibilityRule,
@@ -22,17 +23,22 @@ export const COND_OPS: readonly CondOp[] = ["eq", "ne", "in", "nin", "gt", "gte"
 /** `matches` reads at most this many characters of the answer. */
 export const MATCH_INPUT_LIMIT = 200;
 
+/** Most ways a `matches` pattern may have to split one answer (see matchesProblem). */
+const MATCH_WAYS_LIMIT = 1e7;
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NUMBER_RE = /^\s*-?\d+(?:\.\d+)?\s*$/;
 
 /**
  * Evaluates a condition against one person (design doc 4.1). `email` and `email_domain` read the
- * verified email (the domain in lower case); any other field reads `person.answers`. A missing
- * answer fails every check except `ne`, `nin` and `exists: false`. On an array answer `eq`, `in`,
- * the comparisons, `matches` and `domain_in` pass when any element passes; `ne` and `nin` pass when
+ * verified email (the domain in lower case, and so is text compared with it); any other field reads
+ * `person.answers`. No answer (absent, null, blank text, or an array with nothing but blank text)
+ * fails every check except `ne`, `nin` and `exists: false`. On an array answer `eq`, `in`, the
+ * comparisons, `matches` and `domain_in` pass when any element passes; `ne` and `nin` pass when
  * none matches. `eq`/`in` compare the text of the values, so the answer "3" equals 3.
  * Failures carry condition-side facts only (path, field, op), never anyone's answer.
- * A malformed condition throws instead of being guessed at.
+ * A malformed condition, or a `matches` pattern matchesProblem refuses, throws instead of being
+ * guessed at.
  */
 export function evaluateCondition(cond: Cond, person: Person): CondResult {
   const failed: CondFailure[] = [];
@@ -81,8 +87,9 @@ function checkField(cond: FieldCond, person: Person, path: string, failed: CondF
   const ops = COND_OPS.filter((op) => hasOwn(cond, op));
   if (typeof cond.field !== "string" || ops.length !== 1) throw malformed(path);
   const op = ops[0]!;
-  const expected = (cond as unknown as Record<CondOp, unknown>)[op];
-  const ok = testField(op, expected, fieldValue(person, cond.field));
+  const value = (cond as unknown as Record<CondOp, unknown>)[op];
+  const expected = op === "matches" ? compiledPattern(value, path) : cond.field === "email_domain" ? lowerText(value) : value;
+  const ok = testField(op, expected, answered(fieldValue(person, cond.field)));
   if (!ok) failed.push({ path, field: cond.field, op });
   return ok;
 }
@@ -93,45 +100,48 @@ function fieldValue(person: Person, field: string): Answer | undefined {
   return hasOwn(person.answers, field) ? person.answers[field] : undefined;
 }
 
-function testField(op: CondOp, expected: unknown, actual: Answer | undefined): boolean {
+/** The answer as a list without blank text; null when nothing is left, which counts as no answer. */
+function answered(answer: Answer | undefined): (string | number)[] | null {
+  const list: readonly unknown[] = Array.isArray(answer) ? answer : [answer];
+  const kept = list.filter((x): x is string | number => x !== null && x !== undefined && !(typeof x === "string" && x.trim() === ""));
+  return kept.length > 0 ? kept : null;
+}
+
+/** email_domain is read in lower case, so text compared with it is lowered too (Example.ac.kr). */
+function lowerText(value: unknown): unknown {
+  const lower = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : v);
+  return Array.isArray(value) ? value.map(lower) : lower(value);
+}
+
+/** Without an answer only ne, nin and exists: false pass; otherwise any element passing is enough (see evaluateCondition). */
+function testField(op: CondOp, expected: unknown, values: readonly (string | number)[] | null): boolean {
+  if (values === null) return op === "ne" || op === "nin" || (op === "exists" && expected === false);
   switch (op) {
     case "exists":
-      return (expected === true) === present(actual);
+      return expected === true;
     case "eq":
-      return some(actual, (x) => same(x, expected));
+      return values.some((x) => same(x, expected));
     case "ne":
-      return !some(actual, (x) => same(x, expected));
+      return !values.some((x) => same(x, expected));
     case "in":
-      return some(actual, (x) => inList(x, expected));
+      return values.some((x) => inList(x, expected));
     case "nin":
-      return !some(actual, (x) => inList(x, expected));
+      return !values.some((x) => inList(x, expected));
     case "gt":
     case "gte":
     case "lt":
     case "lte":
-      return some(actual, (x) => compare(op, x, expected));
+      return values.some((x) => compare(op, x, expected));
     case "matches": {
-      const re = regex(expected);
-      return re !== null && some(actual, (x) => re.test(String(x).slice(0, MATCH_INPUT_LIMIT)));
+      const re = expected as RegExp;
+      return values.some((x) => re.test(String(x).slice(0, MATCH_INPUT_LIMIT)));
     }
     case "domain_in":
-      return some(actual, (x) => {
+      return values.some((x) => {
         const domain = domainOf(String(x)) ?? String(x).toLowerCase();
         return Array.isArray(expected) && expected.some((d) => String(d).toLowerCase() === domain);
       });
   }
-}
-
-/** True when a scalar answer (or any element of an array answer) passes. A missing answer never does. */
-function some(actual: Answer | undefined, test: (x: string | number) => boolean): boolean {
-  if (actual === null || actual === undefined) return false;
-  return Array.isArray(actual) ? actual.some(test) : test(actual);
-}
-
-function present(actual: Answer | undefined): boolean {
-  if (actual === null || actual === undefined) return false;
-  if (typeof actual === "string") return actual.trim() !== "";
-  return Array.isArray(actual) ? actual.length > 0 : true;
 }
 
 function same(x: string | number, expected: unknown): boolean {
@@ -162,13 +172,126 @@ function compare(op: "gt" | "gte" | "lt" | "lte", x: string | number, expected: 
   return a <= b;
 }
 
-function regex(pattern: unknown): RegExp | null {
-  if (typeof pattern !== "string") return null;
+/** The RegExp of a `matches` condition. A pattern matchesProblem refuses throws, so it never quietly passes or fails. */
+function compiledPattern(pattern: unknown, path: string): RegExp {
+  const problem = matchesProblem(pattern);
+  if (problem !== null) throw new Error(`조건의 정규식을 쓸 수 없습니다(${where(path)}). ${problem}`);
+  return new RegExp(pattern as string);
+}
+
+/**
+ * Why `pattern` cannot be a `matches` value, or null (design doc 4.1). It must compile and stay in
+ * a small subset of JavaScript regular expressions, so that an applicant's answer cannot keep a
+ * backtracking engine busy: groups are (...), (?:...), (?=...) or (?!...); no backreferences; a
+ * group repeated by *, + or {n,} holds no repetition or |; and the ways the pattern can split one
+ * answer of MATCH_INPUT_LIMIT characters stay within MATCH_WAYS_LIMIT. Ways multiply along a
+ * sequence and add up over alternatives; a repetition counts each possible count (a term with w
+ * ways repeated k times has w^k); a pattern that does not start with ^ also tries every start.
+ */
+export function matchesProblem(pattern: unknown): string | null {
+  if (typeof pattern !== "string") return "정규식을 문자열로 적어야 합니다.";
   try {
-    return new RegExp(pattern);
-  } catch {
-    return null;
+    new RegExp(pattern);
+  } catch (e) {
+    return `정규식을 읽을 수 없습니다: ${(e as Error).message}`;
   }
+  return backtrackingProblem(pattern);
+}
+
+/** Ways of one alternative being read, and of the alternatives before it in its group. */
+interface Alternation {
+  /** Ways of the finished alternatives, added up. */
+  done: number;
+  /** Ways of the current alternative's terms before the last one, multiplied. */
+  before: number;
+  /** Ways of the last term, which a quantifier after it may still change. */
+  last: number;
+}
+
+/** matchesProblem for a pattern that compiles: scans it once, counting ways as described there. */
+function backtrackingProblem(pattern: string): string | null {
+  const open: Alternation[] = [{ done: 0, before: 1, last: 1 }];
+  let cur = open[0]!;
+  let topLevelOr = false;
+  const term = (ways: number): void => {
+    cur.before *= cur.last;
+    cur.last = ways;
+  };
+  const total = (a: Alternation): number => a.done + a.before * a.last;
+  for (let i = 0; i < pattern.length; ) {
+    const ch = pattern[i]!;
+    const q = quantifierAt(pattern, i);
+    if (q) {
+      if (q.max === Infinity && cur.last > 1) {
+        return "반복(*, +, {n,})이 붙은 그룹 안에는 다시 반복(*, +, ?, {n,m})이나 |를 쓸 수 없습니다. 답에 따라 판정이 아주 오래 걸릴 수 있으니 그룹을 풀어 쓰거나 [...]로 바꿔 주세요.";
+      }
+      cur.last = repeated(cur.last, q.min, q.max);
+      i = q.end;
+    } else if (ch === "\\") {
+      if (/[1-9]/.test(pattern[i + 1] ?? "")) return "역참조(\\1 같은 것)는 쓸 수 없습니다.";
+      term(1);
+      i += 2;
+    } else if (ch === "[") {
+      i = classEnd(pattern, i);
+      term(1);
+    } else if (ch === "(") {
+      const special = pattern[i + 1] === "?";
+      const kind = pattern[i + 2];
+      if (special && kind !== ":" && kind !== "=" && kind !== "!") return "그룹은 (...), (?:...), (?=...), (?!...)만 쓸 수 있습니다.";
+      open.push((cur = { done: 0, before: 1, last: 1 }));
+      i += special ? 3 : 1;
+    } else if (ch === ")") {
+      const group = total(open.pop()!);
+      cur = open[open.length - 1]!;
+      term(group);
+      i++;
+    } else if (ch === "|") {
+      cur.done = total(cur);
+      cur.before = 1;
+      cur.last = 1;
+      if (open.length === 1) topLevelOr = true;
+      i++;
+    } else {
+      term(1);
+      i++;
+    }
+  }
+  const starts = pattern[0] === "^" && !topLevelOr ? 1 : MATCH_INPUT_LIMIT + 1;
+  if (total(cur) * starts <= MATCH_WAYS_LIMIT) return null;
+  return "반복이 너무 많아 답에 따라 판정이 오래 걸릴 수 있습니다. *, +, ?, {n,m}을 줄이거나 ^로 시작 위치를 고정해 주세요.";
+}
+
+/** The quantifier at `i` (*, +, ?, {n}, {n,} or {n,m}, maybe lazy) with the index after it, or null. */
+function quantifierAt(pattern: string, i: number): { min: number; max: number; end: number } | null {
+  const ch = pattern[i];
+  let q: { min: number; max: number; end: number } | null = null;
+  if (ch === "*" || ch === "+") q = { min: ch === "*" ? 0 : 1, max: Infinity, end: i + 1 };
+  else if (ch === "?") q = { min: 0, max: 1, end: i + 1 };
+  else if (ch === "{") {
+    // Anything else after "{" is a literal brace in a pattern without flags.
+    const m = /^\{(\d+)(,(\d*))?\}/.exec(pattern.slice(i));
+    if (m) q = { min: Number(m[1]), max: m[2] === undefined ? Number(m[1]) : m[3] === "" ? Infinity : Number(m[3]), end: i + m[0].length };
+  }
+  if (q && pattern[q.end] === "?") q.end++;
+  return q;
+}
+
+/** Ways of a term with `ways` ways repeated min..max times; an answer allows at most MATCH_INPUT_LIMIT repeats. */
+function repeated(ways: number, min: number, max: number): number {
+  const hi = Math.min(max, MATCH_INPUT_LIMIT);
+  const lo = Math.min(min, hi);
+  if (ways === 1) return hi - lo + 1;
+  let sum = 0;
+  for (let k = lo; k <= hi && sum <= MATCH_WAYS_LIMIT; k++) sum += Math.pow(ways, k);
+  return sum;
+}
+
+/** The index after the "]" that closes the class opened at `i`. In JavaScript "[]" and "[^]" close at once. */
+function classEnd(pattern: string, i: number): number {
+  let j = i + 1;
+  if (pattern[j] === "^") j++;
+  while (j < pattern.length && pattern[j] !== "]") j += pattern[j] === "\\" ? 2 : 1;
+  return j + 1;
 }
 
 /** The lower-case part after the last "@", or null without one. */
@@ -181,8 +304,12 @@ function join(path: string, segment: string): string {
   return path === "" ? segment : `${path}.${segment}`;
 }
 
+function where(path: string): string {
+  return path === "" ? "맨 위" : path;
+}
+
 function malformed(path: string): Error {
-  return new Error(`조건 형식이 올바르지 않습니다(${path === "" ? "맨 위" : path}). all, any, not, field 중 하나와 연산자 하나로 적어야 합니다.`);
+  return new Error(`조건 형식이 올바르지 않습니다(${where(path)}). all, any, not, field 중 하나와 연산자 하나로 적어야 합니다.`);
 }
 
 /**
@@ -227,6 +354,14 @@ export function resolveTeamDivision(
   if (index < 0) return { division: null, ok: false, reasons: [`고른 부문은 이 트랙에서 열리지 않습니다. ${choices}`] };
   const reason = misfit(defs[index]!, team);
   return reason === null ? { division: chosen, ok: true, reasons: [] } : { division: null, ok: false, reasons: [reason] };
+}
+
+/**
+ * The `track` argument of resolveTeamDivision from a track as event.json carries it (YAML shape,
+ * `division_mode`): `resolveTeamDivision(trackDivisionSpec(eventJson.tracks[id]), eventJson.divisions, team)`.
+ */
+export function trackDivisionSpec(track: { divisions: readonly string[]; division_mode: DivisionMode }): TrackDivisionSpec {
+  return { divisions: track.divisions.slice(), divisionMode: track.division_mode };
 }
 
 function definition(divisions: Readonly<Record<string, DivisionDef>>, id: string): DivisionDef {

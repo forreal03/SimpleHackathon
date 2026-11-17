@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeTeamScores } from "../src/runtime/scoring.js";
+import { rankTeams } from "../src/runtime/ranking.js";
+import { computeTeamScores, overrideApplies } from "../src/runtime/scoring.js";
 import { roundTo } from "../src/runtime/util.js";
 import type { JudgeAggregate, ScoringConfig, TeamRef } from "../src/runtime/types.js";
+import { REFERENCE_VOTES } from "./examples.js";
 import {
   REFERENCE_CRITERIA,
   REFERENCE_FORMULA,
@@ -44,6 +46,22 @@ describe("computeTeamScores: the criteria tree", () => {
     const half = { ...c, inputStep: 0.5 };
     expect(one(half, [{ x: 7.25 }]).judge).toBe(7.5);
     expect(one(half, [{ x: 7.2 }]).judge).toBe(7);
+  });
+
+  it("brings a huge entry down to max instead of letting it overflow, so the ranking holds", () => {
+    const c = scoringConfig({ criteria: [leaf("x", 100)] });
+    for (const huge of [1e297, 1e298, 1e300, Number.MAX_VALUE]) expect(one(c, [{ x: huge }]).judge, String(huge)).toBe(100);
+    const scores = computeTeamScores(c, [team("a"), team("b"), team("c")], [sheet("j", "a", { x: 80 }), sheet("j", "b", { x: 1e300 }), sheet("j", "c", { x: 90 })]);
+    expect(scores.map((s) => [s.id, s.judge, s.score])).toEqual([
+      ["a", 80, 80],
+      ["b", 100, 100],
+      ["c", 90, 90],
+    ]);
+    expect(rankTeams(scores, c.rankGroups).map((t) => [t.id, t.rank])).toEqual([
+      ["b", 1],
+      ["c", 2],
+      ["a", 3],
+    ]);
   });
 });
 
@@ -141,9 +159,8 @@ describe("computeTeamScores: popular vote", () => {
 
 describe("computeTeamScores: reference case (design doc 3.4)", () => {
   // 10-team track, 60 voters × 3 votes = 180 votes, 18 per team on average.
-  const VOTES = [80, 36, 27, 18, 9, 3, 0, 4, 2, 1];
-  const teams = VOTES.map((_, i) => team(`T${i + 1}`, "hackathon"));
-  const votes = Object.fromEntries(VOTES.map((v, i) => [`T${i + 1}`, v]));
+  const teams = REFERENCE_VOTES.map((_, i) => team(`T${i + 1}`, "hackathon"));
+  const votes = Object.fromEntries(REFERENCE_VOTES.map((v, i) => [`T${i + 1}`, v]));
   const config = scoringConfig({ criteria: REFERENCE_CRITERIA, formula: formula(REFERENCE_FORMULA, REFERENCE_CRITERIA, true) });
 
   it("gives the popular part of the table", () => {
@@ -185,6 +202,8 @@ describe("computeTeamScores: formulas, tie_break and overrides", () => {
     const s = one(scoringConfig({ formula: formula("1000000000 ^ 40", []) }), [{ a: 1 }]);
     expect(s.score).toBe(0);
     expect(s.warnings).toEqual(["거듭제곱(^) 결과가 유한한 수가 아니어서 0으로 바꿨습니다."]);
+    const weighted = one(scoringConfig({ criteria: [leaf("a", Number.MAX_VALUE)], components: { judge: 2 } }), [{ a: Number.MAX_VALUE }]);
+    expect(weighted).toMatchObject({ rawScore: 0, score: 0, warnings: ["계산 결과가 유한한 수가 아니어서 0으로 바꿨습니다."] });
   });
 
   it("applies matching overrides in order, later ones winning; formula null means the weighted sum", () => {
@@ -206,6 +225,14 @@ describe("computeTeamScores: formulas, tie_break and overrides", () => {
       [21.6, 22],
       [30.599999999999998, 31],
     ]);
+  });
+
+  it("matches an override when every key it gives matches", () => {
+    expect(overrideApplies({}, "t", null)).toBe(true);
+    expect(overrideApplies({ track: "t" }, "t", "d")).toBe(true);
+    expect(overrideApplies({ track: "t", division: "d" }, "t", null)).toBe(false);
+    expect(overrideApplies({ division: "d" }, "x", "d")).toBe(true);
+    expect(overrideApplies({ track: "t" }, null, null)).toBe(false);
   });
 
   it("refuses a formula that uses variables the team's settings do not have", () => {

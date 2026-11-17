@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BASE_VARS, POPULAR_VARS, criterionMax, maxTotal, scoringVariables } from "../src/runtime/scoring.js";
-import type { Criterion } from "../src/runtime/types.js";
-
-const leaf = (key: string, max: number, weight = 1): Criterion => ({ key, name: key, weight, max });
-const group = (key: string, children: Criterion[], weight = 1): Criterion => ({ key, name: key, weight, children });
+import { group, leaf } from "./helpers.js";
 
 /** The tree of design doc 3.1. */
 const DOC_TREE = [leaf("idea", 25), group("impl", [leaf("done", 10), leaf("ux", 15)])];

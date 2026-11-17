@@ -50,6 +50,24 @@ describe("simple-hackathon CLI errors", () => {
     expect(existsSync(path.join(out, "site"))).toBe(false);
   });
 
+  it("stops at check for a formula no team reaches, which build could not compile", async () => {
+    const file = path.join(out, "event.yaml");
+    const body = "intake: { fields: [ { key: 성함, type: text, roster: name } ] }\ntracks: { a: { name: A } }\nscoring: { criteria: [ { key: x, name: X, max: 10 } ], formula: 'judge +', overrides: [ { when: { track: a }, formula: judge } ] }\n";
+    writeFileSync(file, `schema: 2\nkind: event\nevent: { id: shadow-1, name: Shadow }\n${body}`);
+    expect(await runCli(["check", file])).toBe(1);
+    expect(lines).toContain("ERROR V4     scoring.formula: 8번째 글자 근처: 식이 끝나기 전에 값(숫자, 변수, 함수, 괄호)이 하나 더 와야 합니다.");
+  });
+
+  it("exits 1 with a message, and writes nothing, when build fails after check passed", async () => {
+    const file = path.join(out, "profile.yaml");
+    writeFileSync(file, "schema: 2\nkind: profile\nintake: { fields: [ { key: 성함, type: text, roster: name } ] }\n");
+    expect(await runCli(["check", file])).toBe(0);
+    const site = path.join(out, "site");
+    expect(await runCli(["build", file, "--out", site])).toBe(1);
+    expect(lines.at(-1)).toBe("event.json을 만들지 못했습니다: event.json은 kind: event이고 event.id가 있는 설정에서만 만듭니다.");
+    expect(existsSync(site)).toBe(false);
+  });
+
   it("exits 1 when the file cannot be loaded", async () => {
     expect(await runCli(["check", path.join(out, "missing.yaml")])).toBe(1);
     expect(lines[0]).toMatch(/^ERROR V13 +.*missing\.yaml: 파일을 찾을 수 없습니다/);

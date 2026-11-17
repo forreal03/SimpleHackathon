@@ -1,12 +1,13 @@
 // Validation rules V1–V15 (design doc 7). V13 (extends) is reported while loading, V9 by the server.
 import YAML from "yaml";
 import { addonEnabled, findAddon, listAddons } from "../addons/registry.js";
-import { toCriteria } from "../build/event-json.js";
+import { compileScoring, toCriteria } from "../build/event-json.js";
 import { compileFormula } from "../formula/parse.js";
-import { maxTotal, scoringVariables } from "../runtime/scoring.js";
+import { matchesProblem } from "../runtime/eligibility.js";
+import { maxTotal, overrideApplies, scoringVariables } from "../runtime/scoring.js";
 import type { Cond } from "../runtime/types.js";
 import { roundTo } from "../runtime/util.js";
-import { displayPath, type SourceFile } from "./load.js";
+import { displayPath, loadConfig, type LoadOptions, type SourceFile } from "./load.js";
 import { checkLockedKeys, type ConfigLayer } from "./locked.js";
 import { KOREAN_ERRORS, formatPath, type CriterionConfig, type ResolvedConfig } from "./schema.js";
 
@@ -22,7 +23,7 @@ export interface Diagnostic {
 }
 
 export interface CheckContext {
-  /** Raw text of every file in the extends chain (V8 scans it for secrets). */
+  /** Raw text of every file in the extends chain (V8 scans it for secrets, V12 for locked keys). */
   files: SourceFile[];
 }
 
@@ -39,10 +40,24 @@ export function checkConfig(resolved: ResolvedConfig, ctx: CheckContext): Diagno
     ...checkSecrets(ctx.files),
     ...checkGithubIdentity(resolved),
     ...checkFields(resolved),
-    ...checkLockedKeys(layersOf(ctx.files)),
+    ...checkLocked(resolved, ctx.files),
     ...checkAddons(resolved),
     ...checkReferences(resolved),
   ];
+}
+
+/** What checkFile found: the merged config (null when loading failed), the files read, and every diagnostic. */
+export interface CheckedFile {
+  config: ResolvedConfig | null;
+  files: SourceFile[];
+  diagnostics: Diagnostic[];
+}
+
+/** loadConfig, then checkConfig on what it merged: the load diagnostics come first. */
+export function checkFile(file: string, options: LoadOptions = {}): CheckedFile {
+  const loaded = loadConfig(file, options);
+  if (!loaded.config) return loaded;
+  return { ...loaded, diagnostics: [...loaded.diagnostics, ...checkConfig(loaded.config, { files: loaded.files })] };
 }
 
 const error = (id: string, path: string, message: string): Diagnostic => ({ id, severity: "error", path, message });
@@ -51,7 +66,9 @@ const warning = (id: string, path: string, message: string): Diagnostic => ({ id
 // ── V1: times ────────────────────────────────────────────────────────────────────────────────
 
 /** ISO date-time with seconds optional and a UTC offset (or Z). */
-const STAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const STAMP_RE = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 interface Stamp {
   path: string;
@@ -59,17 +76,31 @@ interface Stamp {
   time: number;
 }
 
-/** A time with an offset as milliseconds, or null. */
+/** A time with an offset as milliseconds, or null. A day the month does not have (04-31) is refused, not rolled over. */
 function timeOf(value: string): number | null {
-  if (!STAMP_RE.test(value)) return null;
+  const m = STAMP_RE.exec(value);
+  if (!m) return null;
+  const [year, month, day] = [m[1], m[2], m[3]].map(Number) as [number, number, number];
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  if (day > (month === 2 && leap ? 29 : DAYS_IN_MONTH[month - 1] ?? 31)) return null;
   const time = Date.parse(value);
   return Number.isNaN(time) ? null : time;
 }
 
+/** One step of a schedule chain: its times, and whether it must come strictly after the step before. */
+interface Step {
+  at: (Stamp | undefined)[];
+  strict: boolean;
+}
+
+const step = (strict: boolean, ...at: (Stamp | undefined)[]): Step => ({ at, strict });
+
 /**
- * V1: every time has an offset, and recruit open < recruit close ≤ sessions ≤ main start < submit
- * deadline ≤ the track's vote window ≤ score_until. A track's own submit_deadline replaces the main
- * one for that track. Missing times are skipped.
+ * V1: every time exists and has an offset, and recruit open < recruit close ≤ sessions ≤ main start
+ * < submit deadline ≤ the track's vote window ≤ score_until. A track's own submit_deadline replaces
+ * the main one for that track. A missing time does not stop the comparisons through it: each time
+ * is compared with the times of the nearest earlier step that has one, strictly when any link
+ * between them is strict. A track without a vote window just skips it.
  */
 function checkSchedule(c: ResolvedConfig): Diagnostic[] {
   const out: Diagnostic[] = [];
@@ -77,52 +108,49 @@ function checkSchedule(c: ResolvedConfig): Diagnostic[] {
     if (value === undefined) return undefined;
     const time = timeOf(value);
     if (time === null) {
-      out.push(error("V1", path, `시각은 "2027-04-04T10:00:00+09:00"처럼 날짜, 시각, UTC 오프셋을 함께 적어야 합니다: ${value}`));
+      const problem = STAMP_RE.test(value) ? "없는 날짜나 시각입니다" : '시각은 "2027-04-04T10:00:00+09:00"처럼 날짜, 시각, UTC 오프셋을 함께 적어야 합니다';
+      out.push(error("V1", path, `${problem}: ${value}`));
       return undefined;
     }
     return { path, value, time };
   };
   const compared = new Set<string>();
-  const order = (a: Stamp | undefined, b: Stamp | undefined, strict: boolean): void => {
-    if (!a || !b || compared.has(`${a.path}>${b.path}`)) return;
+  const order = (a: Stamp, b: Stamp, strict: boolean): void => {
+    if (compared.has(`${a.path}>${b.path}`)) return;
     compared.add(`${a.path}>${b.path}`);
     if (strict ? a.time < b.time : a.time <= b.time) return;
     out.push(error("V1", b.path, `${b.path}(${b.value})는 ${a.path}(${a.value})보다 ${strict ? "늦어야 합니다" : "앞설 수 없습니다"}.`));
+  };
+  const chain = (steps: readonly Step[]): void => {
+    let before: Stamp[] = [];
+    let strict = false;
+    for (const { at, strict: link } of steps) {
+      strict = strict || link;
+      const present = at.filter((x): x is Stamp => x !== undefined);
+      if (present.length === 0) continue;
+      for (const a of before) for (const b of present) order(a, b, strict);
+      before = present;
+      strict = false;
+    }
   };
 
   const s = c.schedule;
   const open = read("schedule.recruit.open", s.recruit?.open);
   const close = read("schedule.recruit.close", s.recruit?.close);
-  const sessions = s.sessions.map((x, i) => read(`schedule.sessions[${i}].at`, x.at)).filter((x): x is Stamp => x !== undefined);
+  const sessions = s.sessions.map((x, i) => read(`schedule.sessions[${i}].at`, x.at));
   const start = read("schedule.main.start", s.main?.start);
   read("schedule.main.end", s.main?.end);
   const deadline = read("schedule.main.submit_deadline", s.main?.submit_deadline);
   const scoreUntil = read("schedule.score_until", s.score_until);
   if (s.results_at !== "off") read("schedule.results_at", s.results_at);
 
-  order(open, close, true);
-  for (const at of sessions) {
-    order(close, at, false);
-    order(at, start, false);
-  }
-  if (sessions.length === 0) order(close, start, false);
-  order(start, deadline, true);
-  const tracks = Object.entries(c.tracks);
-  for (const [id, t] of tracks) {
+  const head = [step(false, open), step(true, close), step(false, ...sessions), step(false, start)];
+  chain([...head, step(true, deadline), step(false, scoreUntil)]);
+  for (const [id, t] of Object.entries(c.tracks)) {
     const own = read(`tracks.${id}.submit_deadline`, t.submit_deadline);
-    order(start, own, true);
-    const due = own ?? deadline;
-    if (t.vote) {
-      const from = read(`tracks.${id}.vote.from`, t.vote.from);
-      const until = read(`tracks.${id}.vote.until`, t.vote.until);
-      order(due, from, false);
-      order(from, until, true);
-      order(until, scoreUntil, false);
-    } else {
-      order(due, scoreUntil, false);
-    }
+    const vote = t.vote ? [step(false, read(`tracks.${id}.vote.from`, t.vote.from)), step(true, read(`tracks.${id}.vote.until`, t.vote.until))] : [];
+    chain([...head, step(true, own ?? deadline), ...vote, step(false, scoreUntil)]);
   }
-  if (tracks.length === 0) order(deadline, scoreUntil, false);
   return out;
 }
 
@@ -266,12 +294,15 @@ interface Sourced<T> {
 /**
  * V4: the formula and tie_break compile with the variables the team has (design doc 3.3), for every
  * track × division a team can be in, so overrides are checked exactly where they apply. Popular-vote
- * variables, and a popular component, need the popular_vote add-on.
+ * variables, and a popular component, need the popular_vote add-on. Formulas no team reaches (one
+ * shadowed by overrides everywhere, or one in an override that matches no track × division) still
+ * go into event.json, so they are checked the way build compiles them (compileScoring).
  */
 function checkFormulas(c: ResolvedConfig): Diagnostic[] {
   const popular = addonEnabled(c, "popular_vote");
   const out: Diagnostic[] = [];
   const seen = new Set<string>();
+  const checked = new Set<string>();
   const report = (path: string, message: string) => {
     if (seen.has(`${path}\n${message}`)) return;
     seen.add(`${path}\n${message}`);
@@ -282,6 +313,7 @@ function checkFormulas(c: ResolvedConfig): Diagnostic[] {
     const where = s.overridden ? ` (${place.label}에 적용될 때)` : "";
     const vars = scoringVariables(toCriteria(s.criteria.value), popular);
     const compile = (source: string, path: string) => {
+      checked.add(path);
       const result = compileFormula(source, vars);
       if (!result.ok) for (const e of result.errors) report(path, `${e.message}${where}`);
     };
@@ -291,6 +323,8 @@ function checkFormulas(c: ResolvedConfig): Diagnostic[] {
       report(`${s.components.path}.popular`, `popular component는 인기투표 add-on(popular_vote)이 켜져 있을 때만 쓸 수 있습니다.${where}`);
     }
   }
+  // A formula checked above with a team's variables also compiles with build's wider set.
+  for (const e of compileScoring(c).errors) if (!checked.has(e.path)) report(e.path, e.message);
   return out;
 }
 
@@ -318,7 +352,7 @@ function scoringAt(c: ResolvedConfig, track: string | null, division: string | n
   let components: Sourced<{ judge?: number; popular?: number }> = { value: s.components, path: "scoring.components" };
   let overridden = false;
   s.overrides.forEach((o, i) => {
-    if ((o.when.track !== undefined && o.when.track !== track) || (o.when.division !== undefined && o.when.division !== division)) return;
+    if (!overrideApplies(o.when, track, division)) return;
     const at = `scoring.overrides[${i}]`;
     overridden = true;
     if (o.criteria !== undefined) criteria = { value: o.criteria, path: `${at}.criteria` };
@@ -337,11 +371,12 @@ function checkPrivacy(c: ResolvedConfig): Diagnostic[] {
 }
 
 const SECRETS: readonly { re: RegExp; what: string }[] = [
-  { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, what: "PEM 개인 키" },
-  { re: /\bghp_[A-Za-z0-9]{20,}/, what: "GitHub 토큰(ghp_)" },
+  { re: /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/, what: "개인 키(PEM, PGP)" },
+  { re: /\bgh[pousr]_[A-Za-z0-9]{20,}/, what: "GitHub 토큰(ghp_, gho_, ghu_, ghs_, ghr_)" },
   { re: /\bgithub_pat_[A-Za-z0-9_]{20,}/, what: "GitHub 토큰(github_pat_)" },
   { re: /\bAIza[0-9A-Za-z_-]{20,}/, what: "Google API 키(AIza)" },
-  { re: /"private_key"|\bprivate_key\s*:/, what: "서비스 계정 키(private_key)" },
+  { re: /\bGOCSPX-[A-Za-z0-9_-]{20,}/, what: "Google OAuth 클라이언트 보안 비밀(GOCSPX-)" },
+  { re: /["']private_key["']|\bprivate_key\s*:/, what: "서비스 계정 키(private_key)" },
 ];
 
 /** V8: secret-looking strings anywhere in the raw files. The secret itself is never echoed. */
@@ -382,7 +417,16 @@ function checkFields(c: ResolvedConfig): Diagnostic[] {
   return out;
 }
 
-/** The layers V12 reads, parsed again from the raw files of the chain. */
+/**
+ * V12: the layers parsed again from the raw files of the chain, then the merged config itself, so a
+ * config built in memory (no files) is checked too. A key a file already broke is reported once.
+ */
+function checkLocked(c: ResolvedConfig, files: readonly SourceFile[]): Diagnostic[] {
+  const fromFiles = checkLockedKeys(layersOf(files));
+  const merged = checkLockedKeys([{ file: "병합된 설정", data: c }]).filter((d) => !fromFiles.some((f) => f.path === d.path));
+  return [...fromFiles, ...merged];
+}
+
 function layersOf(files: readonly SourceFile[]): ConfigLayer[] {
   return files.flatMap((f) => {
     try {
@@ -425,8 +469,9 @@ function checkAddons(c: ResolvedConfig): Diagnostic[] {
 
 /**
  * V15: tracks open defined divisions (and per-division prize tables name them), overrides name
- * defined tracks and divisions, conditions read question keys or email / email_domain, and every
- * `matches` pattern compiles.
+ * defined tracks and divisions (and are warned about when they match no track × division),
+ * conditions read question keys or email / email_domain, and every `matches` pattern passes
+ * matchesProblem. Email addresses in a condition are warned about: event.json is public.
  */
 function checkReferences(c: ResolvedConfig): Diagnostic[] {
   const out: Diagnostic[] = [];
@@ -439,10 +484,16 @@ function checkReferences(c: ResolvedConfig): Diagnostic[] {
       if (!t.divisions.includes(d)) out.push(error("V15", `tracks.${id}.prizes.${d}`, `상금표의 부문 "${d}"는 트랙 ${id}에서 열리지 않습니다.`));
     }
   }
+  const places = teamPlaces(c);
   c.scoring.overrides.forEach(({ when }, i) => {
     const at = `scoring.overrides[${i}].when`;
-    if (when.track !== undefined && !Object.hasOwn(c.tracks, when.track)) out.push(error("V15", `${at}.track`, `덮어쓰기가 가리키는 트랙 "${when.track}"이 tracks에 없습니다.`));
-    if (when.division !== undefined && !Object.hasOwn(c.divisions, when.division)) out.push(error("V15", `${at}.division`, `덮어쓰기가 가리키는 부문 "${when.division}"이 divisions에 없습니다.`));
+    const trackOk = when.track === undefined || Object.hasOwn(c.tracks, when.track);
+    const divisionOk = when.division === undefined || Object.hasOwn(c.divisions, when.division);
+    if (!trackOk) out.push(error("V15", `${at}.track`, `덮어쓰기가 가리키는 트랙 "${when.track}"이 tracks에 없습니다.`));
+    if (!divisionOk) out.push(error("V15", `${at}.division`, `덮어쓰기가 가리키는 부문 "${when.division}"이 divisions에 없습니다.`));
+    if (trackOk && divisionOk && !places.some((p) => overrideApplies(when, p.track, p.division))) {
+      out.push(warning("V15", at, "이 덮어쓰기에 맞는 트랙 · 부문이 없어 어느 팀에도 쓰이지 않습니다. 부문이 그 트랙의 divisions에 있는지 확인하세요."));
+    }
   });
 
   const fields = new Set(["email", "email_domain", ...c.intake.fields.map((f) => f.key)]);
@@ -452,12 +503,11 @@ function checkReferences(c: ResolvedConfig): Diagnostic[] {
     if ("not" in cond) return walk(cond.not, `${at}.not`);
     if (!("field" in cond)) return;
     if (!fields.has(cond.field)) out.push(error("V15", `${at}.field`, `조건이 읽는 질문 "${cond.field}"가 intake.fields에 없습니다. 질문 key나 email, email_domain을 적어 주세요.`));
-    if (cond.matches === undefined) return;
-    try {
-      new RegExp(cond.matches);
-    } catch (e) {
-      out.push(error("V15", `${at}.matches`, `정규식을 읽을 수 없습니다: ${(e as Error).message}`));
+    if (cond.field === "email" && [cond.eq, cond.ne, cond.in, cond.nin].some((v) => v !== undefined)) {
+      out.push(warning("V15", at, "조건에 적은 메일 주소는 공개되는 event.json에 그대로 실립니다. 사전 등록자처럼 개인 메일 명단은 조건 대신 시트 같은 비공개 명단으로 확인하세요."));
     }
+    const problem = cond.matches === undefined ? null : matchesProblem(cond.matches);
+    if (problem !== null) out.push(error("V15", `${at}.matches`, problem));
   };
   for (const [id, d] of Object.entries(c.divisions)) walk(d.when, `divisions.${id}.when`);
   c.intake.eligibility.forEach((rule, i) => walk(rule.when, `intake.eligibility[${i}].when`));

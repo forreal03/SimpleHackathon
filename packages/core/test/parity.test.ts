@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { buildRuntime } from "../scripts/build-runtime.mjs";
 import type { EventJson } from "../src/build/event-json.js";
 import * as runtime from "../src/runtime/index.js";
-import type { JudgeSheet, TeamForDivision, TeamMember, TeamRef, TeamVotes, TrackDivisionSpec, TrackPrizes } from "../src/runtime/types.js";
+import type { JudgeSheet, TeamForDivision, TeamMember, TeamRef, TeamVotes } from "../src/runtime/types.js";
 import { buildExample, referenceCase } from "./examples.js";
 
 /** mulberry32: deterministic numbers in [0, 1), so the fixtures are the same on every run. */
@@ -27,14 +27,17 @@ function teamIds(ranges: readonly string[]): string[] {
   });
 }
 
+/** A track as event.json carries it; both sides convert it with trackDivisionSpec and prizesByTrack. */
+type EventTrack = Parameters<typeof runtime.trackDivisionSpec>[0];
+
 interface Fixture {
   name: string;
   scoring: EventJson["scoring"];
   teams: TeamRef[];
   sheets: JudgeSheet[];
   votes: TeamVotes | null;
-  prizes: Record<string, TrackPrizes>;
-  divisions: { track: TrackDivisionSpec; defs: Record<string, runtime.DivisionDef>; team: TeamForDivision }[];
+  tracks: EventJson["tracks"];
+  divisions: { track: EventTrack; defs: Record<string, runtime.DivisionDef>; team: TeamForDivision }[];
 }
 
 const leavesOf = (list: readonly runtime.Criterion[]): runtime.Criterion[] => list.flatMap((c) => (c.children?.length ? leavesOf(c.children) : [c]));
@@ -57,10 +60,6 @@ function randomSheets(scoring: EventJson["scoring"], teams: readonly TeamRef[], 
   return [...sheets.filter((s) => s.team !== "02"), ...copied];
 }
 
-function prizesOf(eventJson: EventJson): Record<string, TrackPrizes> {
-  return Object.fromEntries(Object.entries(eventJson.tracks).map(([id, t]) => [id, t.prizes]));
-}
-
 function referenceFixtures(): Fixture[] {
   const { eventJson } = buildExample("reference");
   const next = random(2027);
@@ -68,10 +67,11 @@ function referenceFixtures(): Fixture[] {
   const votes = Object.fromEntries(teams.map((t) => [t.id, t.id === "02" ? 0 : Math.floor(next() * 40)]));
   votes["02"] = votes["01"]!;
   const golden = referenceCase(eventJson);
-  const noDivisions = { track: { divisions: [], divisionMode: "declared" as const }, defs: {}, team: { members: [] } };
+  const noDivisions = { track: eventJson.tracks.hackathon!, defs: {}, team: { members: [] } };
+  const { scoring, tracks } = eventJson;
   return [
-    { name: "reference, random sheets", scoring: eventJson.scoring, teams, sheets: randomSheets(eventJson.scoring, teams, next), votes, prizes: prizesOf(eventJson), divisions: [noDivisions] },
-    { name: "reference, design doc 3.4", scoring: eventJson.scoring, ...golden, prizes: prizesOf(eventJson), divisions: [] },
+    { name: "reference, random sheets", scoring, teams, sheets: randomSheets(scoring, teams, next), votes, tracks, divisions: [noDivisions] },
+    { name: "reference, design doc 3.4", scoring, ...golden, tracks, divisions: [] },
   ];
 }
 
@@ -79,7 +79,6 @@ function companyFixture(): Fixture {
   const { eventJson } = buildExample("company");
   const next = random(5);
   const main = eventJson.tracks.main!;
-  const spec: TrackDivisionSpec = { divisions: main.divisions, divisionMode: main.division_mode };
   const defs = eventJson.divisions;
   const kinds = ["정직원", "계약직", "학생 인턴", "학생 인턴"];
   const divisionCases: Fixture["divisions"] = [];
@@ -89,10 +88,10 @@ function companyFixture(): Fixture {
       person: { email: `member${i}@example.com`, answers: { "고용 형태": kinds[Math.floor(next() * kinds.length)]! } },
     }));
     const team = { members };
-    divisionCases.push({ track: spec, defs, team }, { track: { ...spec, divisionMode: "declared" }, defs, team: { ...team, declared: "intern" } });
-    return { id, track: "main", division: runtime.resolveTeamDivision(spec, defs, team).division };
+    divisionCases.push({ track: main, defs, team }, { track: { ...main, division_mode: "declared" }, defs, team: { ...team, declared: "intern" } });
+    return { id, track: "main", division: runtime.resolveTeamDivision(runtime.trackDivisionSpec(main), defs, team).division };
   });
-  return { name: "company", scoring: eventJson.scoring, teams, sheets: randomSheets(eventJson.scoring, teams, next), votes: null, prizes: prizesOf(eventJson), divisions: divisionCases };
+  return { name: "company", scoring: eventJson.scoring, teams, sheets: randomSheets(eventJson.scoring, teams, next), votes: null, tracks: eventJson.tracks, divisions: divisionCases };
 }
 
 const FIXTURES = [...referenceFixtures(), companyFixture()];
@@ -125,16 +124,17 @@ describe("runtime parity: dist/runtime.gs.js vs Node", () => {
     it(`scores, ranks and awards like Node: ${fixture.name}`, () => {
       const scores = runtime.computeTeamScores(fixture.scoring, fixture.teams, fixture.sheets, fixture.votes);
       const ranked = runtime.rankTeams(scores, fixture.scoring.rankGroups);
-      const awards = runtime.assignPrizes(ranked, fixture.prizes);
+      const awards = runtime.assignPrizes(ranked, runtime.prizesByTrack(fixture.tracks));
+      expect(awards.some((a) => a.teams.length > 0)).toBe(true);
       expect(inBundle("SHK.computeTeamScores(input.scoring, input.teams, input.sheets, input.votes)", fixture)).toEqual(json(scores));
       expect(inBundle("SHK.rankTeams(input.scores, input.rankGroups)", { scores, rankGroups: fixture.scoring.rankGroups })).toEqual(json(ranked));
-      expect(inBundle("SHK.assignPrizes(input.ranked, input.prizes)", { ranked, prizes: fixture.prizes })).toEqual(json(awards));
+      expect(inBundle("SHK.assignPrizes(input.ranked, SHK.prizesByTrack(input.tracks))", { ranked, tracks: fixture.tracks })).toEqual(json(awards));
     });
 
     if (fixture.divisions.length === 0) continue;
     it(`resolves divisions like Node: ${fixture.name}`, () => {
-      const expected = fixture.divisions.map((c) => runtime.resolveTeamDivision(c.track, c.defs, c.team));
-      expect(inBundle("input.map((c) => SHK.resolveTeamDivision(c.track, c.defs, c.team))", fixture.divisions)).toEqual(json(expected));
+      const expected = fixture.divisions.map((c) => runtime.resolveTeamDivision(runtime.trackDivisionSpec(c.track), c.defs, c.team));
+      expect(inBundle("input.map((c) => SHK.resolveTeamDivision(SHK.trackDivisionSpec(c.track), c.defs, c.team))", fixture.divisions)).toEqual(json(expected));
     });
   }
 });

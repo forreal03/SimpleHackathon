@@ -18,7 +18,8 @@ export function rankGroupKey(team: TeamRef, rankGroups: readonly RankGroupKey[])
 /**
  * Ranks teams inside each rank group: teams with equal values for `rankGroups` are ranked together.
  * Order: `score` descending, then each `tieBreak` value in turn, descending (computeTeamScores has
- * already rounded both to precision). Teams equal on all of them share a rank (1, 2, 2, 4).
+ * already rounded both to precision). Teams equal on all of them share a rank (1, 2, 2, 4). A value
+ * that is not a number ranks below every number.
  *
  * Returns every team once, grouped by `group` and ordered by rank inside each group.
  */
@@ -45,12 +46,24 @@ export function rankTeams(scores: readonly TeamScore[], rankGroups: readonly Ran
 
 /** Negative when `a` ranks above `b`. */
 function compareScores(a: TeamScore, b: TeamScore): number {
-  if (a.score !== b.score) return b.score - a.score;
+  const byScore = descending(a.score, b.score);
+  if (byScore !== 0) return byScore;
   const n = Math.min(a.tieBreak.length, b.tieBreak.length);
   for (let i = 0; i < n; i++) {
-    if (a.tieBreak[i] !== b.tieBreak[i]) return b.tieBreak[i]! - a.tieBreak[i]!;
+    const byTieBreak = descending(a.tieBreak[i]!, b.tieBreak[i]!);
+    if (byTieBreak !== 0) return byTieBreak;
   }
   return 0;
+}
+
+/**
+ * Larger first. NaN, or anything else that is not a number (null after a trip through JSON), counts
+ * as the lowest value, so the sort order stays consistent and the same on every engine.
+ */
+function descending(a: number, b: number): number {
+  const x = typeof a === "number" && !Number.isNaN(a) ? a : -Infinity;
+  const y = typeof b === "number" && !Number.isNaN(b) ? b : -Infinity;
+  return x === y ? 0 : x > y ? -1 : 1;
 }
 
 /**
@@ -90,6 +103,11 @@ export function assignPrizes(ranked: readonly RankedTeam[], prizes: Readonly<Rec
     }
   });
   return awards;
+}
+
+/** The `prizes` argument of assignPrizes from event.json's tracks: track id → that track's `prizes`. */
+export function prizesByTrack(tracks: Readonly<Record<string, { prizes: TrackPrizes }>>): Record<string, TrackPrizes> {
+  return Object.fromEntries(Object.entries(tracks).map(([id, track]) => [id, track.prizes]));
 }
 
 /** The table of a group: the track's list, or the entry for the group's division in a per-division map. */

@@ -20,7 +20,8 @@ import {
 } from "./ast.js";
 
 const POW_WARNING = "거듭제곱(^) 결과가 유한한 수가 아니어서 0으로 바꿨습니다.";
-const RESULT_WARNING = "계산 결과가 유한한 수가 아니어서 0으로 바꿨습니다.";
+/** Also used by the weighted-sum final score (scoring.ts). */
+export const RESULT_WARNING = "계산 결과가 유한한 수가 아니어서 0으로 바꿨습니다.";
 
 /**
  * Checks node kinds, operators, function names, argument counts, limits and variable names

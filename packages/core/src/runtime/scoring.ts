@@ -1,5 +1,5 @@
 // Criteria tree, judge aggregation, components and the final score (design doc 3).
-import { evaluateAst, validateAst } from "./formula/evaluate.js";
+import { RESULT_WARNING, evaluateAst, validateAst } from "./formula/evaluate.js";
 import { rankGroupKey } from "./ranking.js";
 import type {
   CompiledFormula,
@@ -7,6 +7,7 @@ import type {
   Criterion,
   JudgeAggregate,
   JudgeSheet,
+  OverrideWhen,
   PopularNormalize,
   PopularValues,
   ScoringConfig,
@@ -90,11 +91,14 @@ type Settings = Omit<ScoringConfig, "overrides" | "rankGroups">;
 function settingsFor(config: ScoringConfig, team: TeamRef): Settings {
   let settings: Settings = config;
   for (const { when, ...fields } of config.overrides) {
-    const trackOk = when.track === undefined || when.track === team.track;
-    const divisionOk = when.division === undefined || when.division === team.division;
-    if (trackOk && divisionOk) settings = { ...settings, ...fields };
+    if (overrideApplies(when, team.track, team.division)) settings = { ...settings, ...fields };
   }
   return settings;
+}
+
+/** Whether an override's `when` matches a team in `track` / `division` (null: none): every key given must match. */
+export function overrideApplies(when: OverrideWhen, track: string | null, division: string | null): boolean {
+  return (when.track === undefined || when.track === track) && (when.division === undefined || when.division === division);
 }
 
 /** A judge's counted sheet: the total and the points of every criterion node by key. */
@@ -127,7 +131,7 @@ function scoreTeam(settings: Settings, team: TeamRef, sheets: readonly JudgeShee
     return result.value;
   };
 
-  const rawScore = settings.formula ? evaluate(settings.formula) : weightedSum(settings.components, judge, popular);
+  const rawScore = settings.formula ? evaluate(settings.formula) : weightedSum(settings.components, judge, popular, warnings);
   return {
     id: team.id,
     track: team.track,
@@ -267,15 +271,17 @@ function normalizeVotes(how: PopularNormalize, v: VoteGroup): number {
   }
 }
 
-/** S without a formula: Σ components[k] × value(k). */
-function weightedSum(components: Components, judge: number, popular: PopularValues | null): number {
+/** S without a formula: Σ components[k] × value(k). Like a formula's result, a value that is not finite becomes 0 with a warning. */
+function weightedSum(components: Components, judge: number, popular: PopularValues | null, warnings: string[]): number {
   let total = 0;
   if (components.judge) total += components.judge * judge;
   if (components.popular) {
     if (!popular) throw new Error("인기투표 표가 없어 popular component를 계산할 수 없습니다. popular_vote add-on을 켜고 표를 넘겨 주세요.");
     total += components.popular * popular.popular;
   }
-  return total;
+  if (Number.isFinite(total)) return total;
+  if (warnings.indexOf(RESULT_WARNING) < 0) warnings.push(RESULT_WARNING);
+  return 0;
 }
 
 function formulaVars(

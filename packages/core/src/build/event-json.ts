@@ -94,24 +94,41 @@ export function toCriteria(list: readonly CriterionConfig[]): Criterion[] {
   });
 }
 
-/**
- * The runtime ScoringConfig (camelCase, defaults filled in, formulas compiled to ASTs). Formulas
- * compile against the variables of every criteria tree in the config; checkConfig (V4) has already
- * checked each one against the exact variables of the teams it applies to, and the runtime checks
- * again per team. Throws when a formula does not compile.
- */
+/** The runtime ScoringConfig (see compileScoring). Throws when a formula does not compile. */
 export function buildScoringConfig(resolved: ResolvedConfig): ScoringConfig {
+  const { scoring, errors } = compileScoring(resolved);
+  if (!scoring) throw new Error(errors.map((e) => `${e.path}: ${e.message}`).join(" / "));
+  return scoring;
+}
+
+/** A formula of the scoring section that does not compile, at its config path ("scoring.overrides[1].formula"). */
+export interface FormulaError {
+  path: string;
+  message: string;
+}
+
+/**
+ * The runtime ScoringConfig (camelCase, defaults filled in, formulas compiled to ASTs), or every
+ * compile error. Every formula and tie_break, the base ones and those of every override, compiles
+ * against the variables of all criteria trees in the config, also when no team reaches it.
+ * checkConfig (V4) reports these errors, so a config that passes check builds; V4 also checks each
+ * formula with the exact variables of every track × division it applies to, and the runtime checks
+ * again per team.
+ */
+export function compileScoring(resolved: ResolvedConfig): { scoring: ScoringConfig; errors: [] } | { scoring: null; errors: FormulaError[] } {
   const s = resolved.scoring;
   const trees = [s.criteria, ...s.overrides.map((o) => o.criteria ?? [])].flatMap(toCriteria);
   const allowed = scoringVariables(trees, addonEnabled(resolved, "popular_vote"));
+  const errors: FormulaError[] = [];
   const compile = (source: string, path: string): CompiledFormula => {
     const result = compileFormula(source, allowed);
-    if (!result.ok) throw new Error(`${path}: ${result.errors.map((e) => e.message).join(" / ")}`);
-    return { source, ast: result.ast };
+    if (result.ok) return { source, ast: result.ast };
+    for (const e of result.errors) errors.push({ path, message: e.message });
+    return { source, ast: { k: "n", v: 0 } };
   };
   const tieBreak = (list: readonly string[], path: string) => list.map((source, i) => compile(source, `${path}[${i}]`));
 
-  return {
+  const scoring: ScoringConfig = {
     criteria: toCriteria(s.criteria),
     inputStep: s.input_step,
     judgeAggregate: judgeAggregate(s.judge_aggregate),
@@ -137,6 +154,7 @@ export function buildScoringConfig(resolved: ResolvedConfig): ScoringConfig {
       return out;
     }),
   };
+  return errors.length === 0 ? { scoring, errors: [] } : { scoring: null, errors };
 }
 
 function judgeAggregate(a: { method: JudgeAggregate["method"]; trim?: number }): JudgeAggregate {

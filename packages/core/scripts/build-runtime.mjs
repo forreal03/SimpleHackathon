@@ -12,6 +12,10 @@ export const RUNTIME_OUT = path.join(pkgDir, "dist", "runtime.gs.js");
 export async function buildRuntime({ write = true } = {}) {
   const pkg = JSON.parse(readFileSync(path.join(pkgDir, "package.json"), "utf8"));
   const result = await build({
+    // Module path comments are relative to the package wherever the build runs from, and Korean
+    // messages stay readable in the Apps Script editor instead of becoming \u escapes.
+    absWorkingDir: pkgDir,
+    charset: "utf8",
     entryPoints: [path.join(pkgDir, "src", "runtime", "index.ts")],
     outfile: RUNTIME_OUT,
     bundle: true,

@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildRuntime } from "../scripts/build-runtime.mjs";
 import { compileFormula } from "../src/formula/parse.js";
+import { matchesProblem } from "../src/runtime/eligibility.js";
 import { evaluateAst, validateAst } from "../src/runtime/formula/evaluate.js";
 
 const pkgDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,6 +42,13 @@ describe("runtime bundle (dist/runtime.gs.js)", () => {
     expect(code.split("\n")[0]).toBe(`// ${pkg.name} runtime v${pkg.version}. Generated from src/runtime by scripts/build-runtime.mjs; do not edit.`);
   });
 
+  it("keeps Korean messages readable and names modules relative to the package, wherever it is built", () => {
+    expect(code).toContain("조건 형식이 올바르지 않습니다");
+    expect(code).not.toMatch(/\\u[0-9a-fA-F]{4}/);
+    expect(code).toMatch(/^ *\/\/ src\/runtime\/eligibility\.ts$/m);
+    expect(code).not.toContain(pkgDir);
+  });
+
   it("defines SHK in a context without Node globals", () => {
     expect(vm.runInContext("[typeof process, typeof require, typeof Buffer, typeof module]", ctx)).toEqual(["undefined", "undefined", "undefined", "undefined"]);
     const api = vm.runInContext("Object.keys(SHK).sort()", ctx) as string[];
@@ -51,14 +59,27 @@ describe("runtime bundle (dist/runtime.gs.js)", () => {
         "computeTeamScores",
         "evaluateAst",
         "evaluateCondition",
+        "matchesProblem",
         "maxTotal",
+        "overrideApplies",
+        "prizesByTrack",
         "rankTeams",
         "resolveTeamDivision",
         "roundTo",
         "scoringVariables",
+        "trackDivisionSpec",
         "validateAst",
       ]),
     );
+    expect(api).not.toContain("NODE_KINDS");
+  });
+
+  it("refuses a dangerous matches pattern exactly like Node", () => {
+    const cond = { field: "이름", matches: "^([A-Za-z]+ ?)+$" };
+    const person = { email: "a@example.com", answers: { 이름: `${"A".repeat(28)}1` } };
+    ctx.input = JSON.stringify({ cond, person });
+    expect(() => vm.runInContext("SHK.evaluateCondition(JSON.parse(input).cond, JSON.parse(input).person)", ctx)).toThrow("조건의 정규식을 쓸 수 없습니다(맨 위).");
+    expect(inBundle("SHK.matchesProblem(input)", "^(\\w+\\s?)*$")).toBe(matchesProblem("^(\\w+\\s?)*$"));
   });
 
   it("evaluates formula ASTs exactly like Node", () => {

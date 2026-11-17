@@ -77,6 +77,24 @@ describe("loadConfig: extends", () => {
     expect(deep.diagnostics[0]!.message).toMatch(/^extends가 5단계보다 깊습니다/);
   });
 
+  it("refuses the same parent twice in one extends list, however it is written", () => {
+    put("a.yaml", "schema: 2\nkind: profile\n");
+    expect(errors(eventFile("extends: [../../a.yaml, ../test-2027/../../a.yaml]\n"))).toEqual([["V13", "extends에 같은 파일을 두 번 적었습니다: ../test-2027/../../a.yaml"]]);
+  });
+
+  it("stops after 50 file reads, so repeated parents cannot multiply the work", () => {
+    const level = (name: string, next: string | null) => {
+      for (let i = 1; i <= 4; i++) put(`${name}${i}.yaml`, `schema: 2\nkind: profile\n${next ? `extends: [${[1, 2, 3, 4].map((j) => `./${next}${j}.yaml`).join(", ")}]\n` : ""}`);
+    };
+    level("c", null);
+    level("b", "c");
+    level("a", "b");
+    const result = loadConfig(eventFile(`extends: [${[1, 2, 3, 4].map((j) => `../../a${j}.yaml`).join(", ")}]\n`));
+    expect(result.config).toBeNull();
+    expect(result.diagnostics.map((d) => [d.id, d.message])).toEqual([["V13", "extends로 읽는 파일이 50개를 넘습니다. 같은 부모를 여러 경로로 거치지 않게 extends를 줄여 주세요."]]);
+    expect(loadConfig(eventFile("extends: [../../b1.yaml, ../../b2.yaml]\n")).diagnostics).toEqual([]);
+  });
+
   it("reports missing files, preset major mismatches and malformed references", () => {
     expect(errors(eventFile("extends: ./nope.yaml\n"))).toEqual([["V13", expect.stringMatching(/^파일을 찾을 수 없습니다: .*nope\.yaml \(.*event\.yaml의 extends: \.\/nope\.yaml\)$/)]]);
     expect(errors(eventFile("extends: profile:ghost\n"))).toEqual([["V13", expect.stringContaining("profiles/ghost.yaml")]]);

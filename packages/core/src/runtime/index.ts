@@ -6,7 +6,6 @@ export {
   FUNCTIONS,
   FUNCTION_NAMES,
   LIMITS,
-  NODE_KINDS,
   RESERVED_WORDS,
   UNARY_OPS,
   type Arity,

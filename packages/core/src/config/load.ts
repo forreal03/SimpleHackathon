@@ -31,6 +31,9 @@ export interface LoadResult {
 /** Deepest allowed parent: the entry file is depth 0. */
 export const MAX_EXTENDS_DEPTH = 5;
 
+/** Most files one load reads, counting a file again each time the chain reaches it (diamonds). */
+export const MAX_EXTENDS_FILES = 50;
+
 /** Bundled presets: src/config/presets, copied to dist/config/presets by the build. */
 export const PRESETS_DIR = fileURLToPath(new URL("./presets/", import.meta.url));
 
@@ -50,7 +53,7 @@ export function displayPath(file: string): string {
  */
 export function loadConfig(file: string, options: LoadOptions = {}): LoadResult {
   const entry = path.resolve(file);
-  const loader: Loader = { home: options.home ? path.resolve(options.home) : inferHome(entry), files: [], diagnostics: [] };
+  const loader: Loader = { home: options.home ? path.resolve(options.home) : inferHome(entry), files: [], diagnostics: [], reads: 0 };
   const read = readLayers(loader, entry, [], null);
   if (!read) return { config: null, files: loader.files, diagnostics: loader.diagnostics };
 
@@ -71,6 +74,8 @@ interface Loader {
   home: string | undefined;
   files: SourceFile[];
   diagnostics: Diagnostic[];
+  /** Files read so far, see MAX_EXTENDS_FILES. */
+  reads: number;
 }
 
 /** Where a reference points, and the preset major it asks for. */
@@ -96,6 +101,10 @@ function readLayers(loader: Loader, file: string, chain: readonly string[], targ
   const from = chain.length > 0 ? ` (${displayPath(chain[chain.length - 1]!)}의 extends: ${target?.ref})` : "";
   if (chain.includes(file)) return v13(loader, file, `extends가 순환합니다: ${[...chain, file].map(displayPath).join(" → ")}`);
   if (chain.length > MAX_EXTENDS_DEPTH) return v13(loader, file, `extends가 ${MAX_EXTENDS_DEPTH}단계보다 깊습니다: ${[...chain, file].map(displayPath).join(" → ")}`);
+  // Reported once; every read after the limit stops here, so the work stays bounded.
+  if (++loader.reads > MAX_EXTENDS_FILES) {
+    return loader.reads === MAX_EXTENDS_FILES + 1 ? v13(loader, file, `extends로 읽는 파일이 ${MAX_EXTENDS_FILES}개를 넘습니다. 같은 부모를 여러 경로로 거치지 않게 extends를 줄여 주세요.`) : null;
+  }
 
   let text: string;
   try {
@@ -124,9 +133,13 @@ function readLayers(loader: Loader, file: string, chain: readonly string[], targ
   const layers: ConfigLayer[] = [];
   let broken = false;
   const refs = header.data.extends === undefined ? [] : typeof header.data.extends === "string" ? [header.data.extends] : header.data.extends;
+  const parents: string[] = [];
   for (const ref of refs) {
     const parent = resolveRef(loader, ref, file);
-    const read = parent && readLayers(loader, parent.file, [...chain, file], parent);
+    const again = parent !== null && parents.includes(parent.file);
+    if (again) v13(loader, file, `extends에 같은 파일을 두 번 적었습니다: ${ref}`);
+    if (parent) parents.push(parent.file);
+    const read = parent && !again && readLayers(loader, parent.file, [...chain, file], parent);
     if (read) layers.push(...read.layers);
     else broken = true;
   }

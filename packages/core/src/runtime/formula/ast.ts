@@ -1,10 +1,7 @@
-// Tables of the formula language (design doc 2.2–2.4): node kinds, operators, functions with their
-// arity, and limits. The node shapes themselves are in ../types.ts. Membership checks go through
-// arrays, never through `key in object`, so names like "constructor" or "__proto__" never match.
+// Tables of the formula language (design doc 2.2–2.4): operators, functions with their arity, and
+// limits. The node shapes themselves are in ../types.ts. Membership checks go through arrays, never
+// through `key in object`, so names like "constructor" or "__proto__" never match.
 import type { BinaryOp, FuncName, UnaryOp } from "../types.js";
-
-/** Node kinds: number, variable, unary, binary, call. */
-export const NODE_KINDS = ["n", "v", "u", "b", "c"] as const;
 
 export const UNARY_OPS: readonly UnaryOp[] = ["-", "not"];
 

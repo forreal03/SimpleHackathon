@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkApplicantEligibility, evaluateCondition, resolveTeamDivision } from "../src/runtime/eligibility.js";
+import { checkApplicantEligibility, evaluateCondition, matchesProblem, resolveTeamDivision, trackDivisionSpec } from "../src/runtime/eligibility.js";
 import type { Answer, Cond, DivisionDef, Person, TeamMember } from "../src/runtime/types.js";
 
 const person = (answers: Record<string, Answer> = {}, email = "kim@example.ac.kr"): Person => ({ email, answers });
@@ -77,6 +77,30 @@ describe("evaluateCondition: operators", () => {
     expect(ok({ field: "q", nin: ["x"] }, empty)).toBe(true);
   });
 
+  it("treats blank text, null and arrays of blank text as no answer for every operator", () => {
+    const blanks: Answer[] = ["", "  ", null, [], ["", " "]];
+    for (const blank of blanks) {
+      const p = person({ q: blank });
+      const label = JSON.stringify(blank);
+      for (const cond of [{ eq: "" }, { eq: "  " }, { in: ["", "x"] }, { matches: "^[0-9]*$" }, { matches: "^\\s*$" }, { domain_in: [""] }, { gte: 0 }, { exists: true }]) {
+        expect(ok({ field: "q", ...cond } as Cond, p), `${label} ${JSON.stringify(cond)}`).toBe(false);
+      }
+      for (const cond of [{ ne: "" }, { nin: [""] }, { exists: false }]) {
+        expect(ok({ field: "q", ...cond } as Cond, p), `${label} ${JSON.stringify(cond)}`).toBe(true);
+      }
+    }
+    const rules = [{ when: { field: "학번", matches: "^[0-9]{0,10}$" }, message: "학번을 적어 주세요" }];
+    expect(checkApplicantEligibility(rules, person({ 학번: "" }))).toEqual({ ok: false, messages: ["학번을 적어 주세요"] });
+  });
+
+  it("compares text with email_domain in lower case, as it reads the domain", () => {
+    const p = person({}, "kim@Example.ac.kr");
+    expect(ok({ field: "email_domain", eq: "Example.AC.kr" }, p)).toBe(true);
+    expect(ok({ field: "email_domain", in: ["gmail.com", "EXAMPLE.AC.KR"] }, p)).toBe(true);
+    expect(ok({ field: "email_domain", ne: "EXAMPLE.ac.kr" }, p)).toBe(false);
+    expect(ok({ field: "email_domain", nin: ["Example.ac.kr"] }, p)).toBe(false);
+  });
+
   it("never reads answers through the prototype chain", () => {
     expect(ok({ field: "constructor", exists: true }, person())).toBe(false);
     expect(ok({ field: "toString", exists: true }, person())).toBe(false);
@@ -94,6 +118,82 @@ describe("evaluateCondition: multi answers", () => {
     expect(ok({ field: "소속", nin: ["동아리 B", "동아리 C"] }, p)).toBe(false);
     expect(ok({ field: "소속", ne: "동아리 A" }, p)).toBe(false);
     expect(ok({ field: "소속", matches: "C$" }, p)).toBe(true);
+  });
+
+  it("compares sizes and domains element by element, any one passing", () => {
+    const scores = person({ 점수: ["3", "8"], 메일: ["a@gmail.com", "b@Example.ac.kr"] });
+    expect(ok({ field: "점수", gt: 5 }, scores)).toBe(true);
+    expect(ok({ field: "점수", gt: 8 }, scores)).toBe(false);
+    expect(ok({ field: "점수", lte: 3 }, scores)).toBe(true);
+    expect(ok({ field: "점수", lt: 3 }, scores)).toBe(false);
+    expect(ok({ field: "메일", domain_in: ["example.ac.kr"] }, scores)).toBe(true);
+    expect(ok({ field: "메일", domain_in: ["naver.com"] }, scores)).toBe(false);
+  });
+
+  it("leaves blank elements out, so an array of blanks is no answer", () => {
+    const p = person({ 소속: ["", "동아리 A"], 빈: [] });
+    expect(ok({ field: "소속", eq: "" }, p)).toBe(false);
+    expect(ok({ field: "소속", eq: "동아리 A" }, p)).toBe(true);
+    expect(ok({ field: "빈", exists: false }, p)).toBe(true);
+  });
+});
+
+describe("evaluateCondition: matches patterns", () => {
+  const p = person({ "영문 이름": `${"A".repeat(28)}1` });
+
+  it("throws on a pattern that does not compile, also under not, instead of passing everyone", () => {
+    expect(() => evaluateCondition({ not: { field: "영문 이름", matches: "[" } }, p)).toThrow("조건의 정규식을 쓸 수 없습니다(not). 정규식을 읽을 수 없습니다");
+    expect(() => evaluateCondition({ field: "x", matches: 3 } as unknown as Cond, person())).toThrow("정규식을 문자열로 적어야 합니다.");
+  });
+
+  it("throws on a pattern a crafted answer could keep busy, before running it", () => {
+    const started = Date.now();
+    expect(() => evaluateCondition({ field: "영문 이름", matches: "^([A-Za-z]+ ?)+$" }, p)).toThrow("조건의 정규식을 쓸 수 없습니다(맨 위). 반복(*, +, {n,})이 붙은 그룹");
+    expect(() => checkApplicantEligibility([{ when: { all: [{ field: "x", matches: "^(\\w+\\s?)*$" }] }, message: "m" }], p)).toThrow("(all[0])");
+    expect(Date.now() - started).toBeLessThan(100);
+  });
+});
+
+describe("matchesProblem", () => {
+  it("accepts the patterns conditions usually need", () => {
+    const fine = [
+      "",
+      "^\\d{8}$",
+      "^[0-9]{0,10}$",
+      "@example\\.ac\\.kr$",
+      "^(19|20)\\d{2}$",
+      "^(?:\\d{3}-){2}\\d{4}$",
+      "^\\d+(\\.\\d+)?$",
+      "^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$",
+      "^(?!test)",
+      "^김",
+      "C$",
+      "a{,5}[]\\]",
+    ];
+    for (const pattern of fine) expect(matchesProblem(pattern), pattern).toBeNull();
+  });
+
+  it("refuses patterns that do not compile, backreferences and groups outside the subset", () => {
+    expect(matchesProblem("(")).toMatch(/^정규식을 읽을 수 없습니다: /);
+    expect(matchesProblem(["a"])).toBe("정규식을 문자열로 적어야 합니다.");
+    expect(matchesProblem("(a)\\1")).toBe("역참조(\\1 같은 것)는 쓸 수 없습니다.");
+    for (const group of ["(?<name>a)", "(?<=a)b", "(?<!a)b", "(?i:a)"]) {
+      expect(matchesProblem(group), group).toBe("그룹은 (...), (?:...), (?=...), (?!...)만 쓸 수 있습니다.");
+    }
+    expect(matchesProblem("[\\1(?<x>]")).toBeNull();
+  });
+
+  it("refuses repetition inside a repeated group, and alternatives repeated", () => {
+    for (const nested of ["^(\\w+\\s?)*$", "^([A-Za-z]+ ?)+$", "(a*)*", "(a?){2,}", "^(a|b)+$", "(?:x(?:y|z))*"]) {
+      expect(matchesProblem(nested), nested).toMatch(/^반복\(\*, \+, \{n,\}\)이 붙은 그룹 안에는/);
+    }
+  });
+
+  it("refuses patterns with too many ways to split a 200-character answer", () => {
+    for (const heavy of ["^\\s*\\s*\\s*\\s*x", ".*a.*a.*b", ".*.*.*.*!", `^${"a?".repeat(30)}${"a".repeat(30)}$`, "^(a|b){40}$", "^\\d{0,100}\\d{0,100}\\d{0,100}\\d{0,100}x"]) {
+      expect(matchesProblem(heavy), heavy).toMatch(/^반복이 너무 많아/);
+    }
+    expect(matchesProblem("^\\s*\\s*\\s*x")).toBeNull();
   });
 });
 
@@ -242,5 +342,11 @@ describe("resolveTeamDivision", () => {
 
   it("throws when a track opens a division that is not defined", () => {
     expect(() => resolveTeamDivision({ divisions: ["ghost"], divisionMode: "auto" }, {}, { members: students })).toThrow('"ghost"');
+  });
+
+  it("takes a track as event.json carries it through trackDivisionSpec", () => {
+    const track = { name: "본선", teams: ["01-12"], divisions: ["student"], division_mode: "auto" as const };
+    expect(trackDivisionSpec(track)).toEqual({ divisions: ["student"], divisionMode: "auto" });
+    expect(resolveTeamDivision(trackDivisionSpec(track), { student: def("all_members") }, { members: students })).toEqual({ division: "student", ok: true, reasons: [] });
   });
 });

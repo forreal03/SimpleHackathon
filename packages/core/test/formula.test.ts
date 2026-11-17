@@ -3,13 +3,11 @@ import { compileFormula } from "../src/formula/parse.js";
 import { evaluateAst, validateAst } from "../src/runtime/formula/evaluate.js";
 import { scoringVariables } from "../src/runtime/scoring.js";
 import { roundTo } from "../src/runtime/util.js";
-import type { Ast, CompileError, Criterion } from "../src/runtime/types.js";
+import type { Ast, CompileError } from "../src/runtime/types.js";
+import { REFERENCE_CRITERIA, REFERENCE_FORMULA } from "./helpers.js";
 
-/** ENDPoinT 2026: four 25-point criteria, weight omitted (design doc 3.4). */
-const REFERENCE: Criterion[] = ["idea", "done", "ux", "arch"].map((key) => ({ key, name: key, weight: 1, max: 25 }));
-const WITH_VOTES = scoringVariables(REFERENCE, true);
-const WITHOUT_VOTES = scoringVariables(REFERENCE, false);
-const REFERENCE_FORMULA = "0.85 * judge + 15 * sqrt(min(1, votes / (2 * avg_votes)))";
+const WITH_VOTES = scoringVariables(REFERENCE_CRITERIA, true);
+const WITHOUT_VOTES = scoringVariables(REFERENCE_CRITERIA, false);
 const FUNCTION_LIST = "min, max, sum, avg, abs, sqrt, round, floor, ceil, clamp, if";
 
 function compile(source: string, allowed: readonly string[]): Ast {
@@ -365,5 +363,12 @@ describe("roundTo", () => {
     expect(roundTo(Infinity, 2)).toBe(Infinity);
     expect(Object.is(roundTo(-0.001, 2), 0)).toBe(true);
     expect(() => roundTo(1, 2.5)).toThrow("정수");
+  });
+
+  it("keeps values from 2^53 up as they are instead of overflowing to NaN", () => {
+    expect(roundTo(1e303, 6)).toBe(1e303);
+    expect(roundTo(1e302, 9)).toBe(1e302);
+    expect(roundTo(-Number.MAX_VALUE, 2)).toBe(-Number.MAX_VALUE);
+    expect(roundTo(2 ** 53 + 2, 2)).toBe(2 ** 53 + 2);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignPrizes, rankGroupKey, rankTeams } from "../src/runtime/ranking.js";
+import { assignPrizes, prizesByTrack, rankGroupKey, rankTeams } from "../src/runtime/ranking.js";
 import { computeTeamScores } from "../src/runtime/scoring.js";
 import type { RankedTeam, TeamScore } from "../src/runtime/types.js";
 import { formula, leaf, scoringConfig, sheet, team } from "./helpers.js";
@@ -51,6 +51,18 @@ describe("rankTeams", () => {
       ["C", 1],
       ["A", 2],
       ["B", 2],
+    ]);
+  });
+
+  it("puts a score or tie_break value that is not a number last, keeping the others in order", () => {
+    const ranked = rankTeams([scored("A", 80), scored("N", Number.NaN), scored("C", 90), scored("D", 85, [Number.NaN]), scored("E", 85, [1]), scored("Z", null as unknown as number)], ["track"]);
+    expect(ranks(ranked)).toEqual([
+      ["C", 1],
+      ["E", 2],
+      ["D", 3],
+      ["A", 4],
+      ["N", 5],
+      ["Z", 5],
     ]);
   });
 
@@ -113,5 +125,11 @@ describe("assignPrizes", () => {
     ];
     const awards = assignPrizes(list, { h: { student: [{ place: 1, teams: 1, label: "학생부 대상" }] } });
     expect(awards).toEqual([{ group: "h/student", place: 1, label: "학생부 대상", teams: ["S1"], tieExpanded: false }]);
+  });
+
+  it("takes event.json's tracks through prizesByTrack", () => {
+    const tracks = { t: { name: "T", divisions: [], prizes: [{ place: 1, teams: 1 }] }, u: { name: "U", divisions: [], prizes: [] } };
+    expect(prizesByTrack(tracks)).toEqual({ t: [{ place: 1, teams: 1 }], u: [] });
+    expect(assignPrizes(ranked([["A", 9], ["B", 8]]), prizesByTrack(tracks))).toEqual([{ group: "t", place: 1, teams: ["A"], tieExpanded: false }]);
   });
 });

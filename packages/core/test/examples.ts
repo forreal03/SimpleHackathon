@@ -2,8 +2,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildEventJson, type EventJson } from "../src/build/event-json.js";
-import { checkConfig, type Diagnostic } from "../src/config/check.js";
-import { loadConfig } from "../src/config/load.js";
+import { checkFile, type Diagnostic } from "../src/config/check.js";
 import type { ResolvedConfig } from "../src/config/schema.js";
 import type { JudgeSheet, TeamRef, TeamVotes } from "../src/runtime/types.js";
 
@@ -48,9 +47,8 @@ export function referenceCase(eventJson: EventJson): { teams: TeamRef[]; sheets:
 
 /** load + merge + check + build; throws when anything reports an error. */
 export function buildExample(name: ExampleName): BuiltExample {
-  const loaded = loadConfig(EXAMPLES[name]);
-  const diagnostics = loaded.config ? [...loaded.diagnostics, ...checkConfig(loaded.config, { files: loaded.files })] : loaded.diagnostics;
+  const { config, diagnostics } = checkFile(EXAMPLES[name]);
   const errors = diagnostics.filter((d) => d.severity === "error");
-  if (!loaded.config || errors.length > 0) throw new Error(`${name}: ${JSON.stringify(errors, null, 2)}`);
-  return { config: loaded.config, diagnostics, eventJson: buildEventJson(loaded.config) };
+  if (!config || errors.length > 0) throw new Error(`${name}: ${JSON.stringify(errors, null, 2)}`);
+  return { config, diagnostics, eventJson: buildEventJson(config) };
 }
