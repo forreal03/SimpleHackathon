@@ -10,7 +10,7 @@ npm test
 npm run typecheck
 ```
 
-- MCP 서버는 `packages/mcp`, 신청 폼은 `packages/forms`에 있습니다.
+- 판정 엔진과 `simple-hackathon` CLI는 `packages/core`, MCP 서버는 `packages/mcp`, 신청 폼은 `packages/forms`에 있습니다.
 - GitHub을 실제로 부르지 않고도 테스트가 돌도록, MCP는 `test/fake-gh.ts`의 메모리 GitHub을, 폼은 `test/gas-harness.mjs`의 가짜 Apps Script를 씁니다. 새 기능에는 테스트를 같이 넣어 주세요.
 
 ## 지켜 주세요

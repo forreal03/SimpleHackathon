@@ -38,7 +38,7 @@
 
 상태 저장에 Node 내장 `node:sqlite`를 씁니다(네이티브 빌드 없음). 설치는 npm 패키지로 바로 실행하거나 소스에서 빌드합니다.
 
-0.2.0부터 npm 패키지는 서버와 서버가 쓰는 라이브러리(MCP SDK, Octokit, zod, yaml, google-auth-library)를 esbuild로 묶은 **파일 하나**(`dist/index.js`)이고, **런타임 의존성이 없습니다**. 그래서 `npx`는 이 패키지의 tarball 하나(약 0.4 MB)만 받고 다른 패키지를 설치하지 않습니다. 0.1.0은 tsc로 빌드한 여러 파일과 런타임 의존성 8개로 된 그 전 방식이라, `npx`가 의존 패키지도 함께 설치합니다. 번들에 들어간 라이브러리 각각의 라이선스 전문은 `THIRD_PARTY_LICENSES`에, 이름·버전·라이선스 목록은 CycloneDX SBOM(`dist/sbom.cdx.json`)에 있습니다.
+다음 릴리스 0.2.0(아직 출판 전)부터 npm 패키지는 서버와 서버가 쓰는 라이브러리(MCP SDK, Octokit, zod, yaml, google-auth-library)를 esbuild로 묶은 **파일 하나**(`dist/index.js`)이고, **런타임 의존성이 없습니다**. 그래서 `npx`는 이 패키지의 tarball 하나(약 0.4 MB)만 받고 다른 패키지를 설치하지 않습니다. main에서 빌드한 서버는 이미 이 파일 하나입니다. 지금 npm에 있는 0.1.0은 tsc로 빌드한 여러 파일과 런타임 의존성 8개로 된 그 전 방식이라, `npx`가 의존 패키지도 함께 설치합니다. 번들에 들어간 라이브러리 각각의 라이선스 전문은 `THIRD_PARTY_LICENSES`에, 이름·버전·라이선스 목록은 CycloneDX SBOM(`dist/sbom.cdx.json`)에 있습니다.
 
 ```bash
 # npm 패키지로 (MCP 클라이언트 설정에 command: npx, args: [-y, simple-hackathon-ops-mcp@0.1.0])

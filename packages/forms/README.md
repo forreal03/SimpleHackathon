@@ -55,13 +55,13 @@ site/
 
 ## 미리보기
 
-`config.js`의 `CLIENT_ID`나 `ENDPOINT`가 비어 있으면 **데모 모드**로 열립니다. 아무 데도 보내지 않고, `demo-form.js`의 질문으로 화면과 검사를 확인할 수 있습니다(제출 내용은 개발자 도구 콘솔에 찍힘).
+`config.js`의 `CLIENT_ID`나 `ENDPOINT`가 비어 있으면 **데모 모드**로 열립니다. 아무 데도 보내지 않고, `demo-form.js`의 질문으로 화면과 검사를 확인할 수 있습니다(제출 내용은 개발자 도구 콘솔에 찍힘). 이 `site/`를 그대로 올린 [공개 데모](https://forreal03.github.io/SimpleHackathon-ops-mcp/)도 데모 모드라 아무 데도 보내지 않습니다(main의 `site/`가 바뀌면 [`pages.yml`](../../.github/workflows/pages.yml)이 다시 올림).
 
 ```bash
 cd packages/forms/site && python -m http.server 8000   # http://localhost:8000
 ```
 
-로컬(`localhost`·`127.0.0.1`·`file://`·사설 IP)과 데모 모드에서는 날짜와 상관없이 신청서가 열립니다. 닫힌 모습은 주소 끝에 붙여 봅니다. 배포된 사이트에서는 이 주소가 무시됩니다.
+로컬(`localhost`·`127.0.0.1`·`file://`·사설 IP)과 데모 모드에서는 날짜와 상관없이 신청서가 열립니다. 닫힌 모습은 주소 끝에 붙여 봅니다. 데모 모드가 아닌 배포 사이트에서는 이 주소가 무시됩니다(공개 데모에서는 동작합니다).
 
 | 주소 | 화면 |
 | --- | --- |

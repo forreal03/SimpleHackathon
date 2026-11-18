@@ -19,9 +19,9 @@
 
 | 폴더 | 무엇 | 스택 |
 | --- | --- | --- |
-| [`packages/forms`](packages/forms) | 참가 신청 페이지. ENDPoinT 사이트의 신청 화면을 디자인 그대로 옮겼습니다. GitHub 아이디까지 받고, 서버가 기간·입력을 검사해 구글 시트에 씁니다 | HTML·CSS·JS(빌드 없음), GitHub Pages, Google Apps Script, Google Sheets |
-| [`packages/mcp`](packages/mcp) | MCP 서버 [`simple-hackathon-ops-mcp`](https://www.npmjs.com/package/simple-hackathon-ops-mcp). 팀·repo 생성, 조장 maintainer, 마감 잠금·풀기, 멘토·심사위원 읽기 권한, 앱 설치 요청 판정, 일정 토글. 0.2.0부터 npm에는 런타임 의존성 없는 파일 하나로 나갑니다 | TypeScript, Node.js 22+, MCP SDK, zod, Octokit, node:sqlite, esbuild(단일 파일 번들) |
-| [`packages/core`](packages/core) | 판정 엔진. 설정 상속·병합·검사(V1–V15), 점수(가중합 기본 + 선택 수식), 순위·상 배분, 부문 판정, `event.json` 생성과 `simple-hackathon check`/`build` CLI. 같은 소스를 Apps Script용 `runtime.gs.js`로도 빌드합니다. 설계는 [`docs/design/core-engines.md`](docs/design/core-engines.md) | TypeScript, zod, yaml, esbuild |
+| [`packages/forms`](packages/forms) | 참가 신청 페이지. ENDPoinT 사이트의 신청 화면을 디자인 그대로 옮겼습니다. GitHub 아이디까지 받고, 서버가 기간·입력을 검사해 구글 시트에 씁니다. [공개 데모](https://forreal03.github.io/SimpleHackathon-ops-mcp/)는 데모 모드라 신청 내용을 아무 데도 보내지 않습니다 | HTML·CSS·JS(빌드 없음), GitHub Pages, Google Apps Script, Google Sheets |
+| [`packages/mcp`](packages/mcp) | MCP 서버 [`simple-hackathon-ops-mcp`](https://www.npmjs.com/package/simple-hackathon-ops-mcp). 팀·repo 생성, 조장 maintainer, 마감 잠금·풀기, 멘토·심사위원 읽기 권한, 앱 설치 요청 판정, 일정 토글. npm에는 다음 릴리스 0.2.0(아직 출판 전)부터 런타임 의존성 없는 파일 하나로 나갑니다. main에서 빌드한 서버는 이미 이 파일 하나입니다 | TypeScript, Node.js 22.13+, MCP SDK, zod, Octokit, node:sqlite, esbuild(단일 파일 번들) |
+| [`packages/core`](packages/core) | 판정 엔진. 설정 상속·병합·검사(V1–V8, V10–V15), 점수(가중합 기본 + 선택 수식), 순위·상 배분, 부문 판정, `event.json` 생성과 `simple-hackathon check`/`build` CLI. 같은 소스를 Apps Script용 `runtime.gs.js`로도 빌드합니다. 설계는 [`docs/design/core-engines.md`](docs/design/core-engines.md) | TypeScript, zod, yaml, esbuild |
 | [`examples`](examples) | 가짜 데이터 예제 두 개: 두 트랙 reference case(`reference-2track`)와 사내 해커톤(`company-internal`) | YAML |
 | [`config`](config) | 대회 설정 양식, 앱 정책, 팀 README 양식, 환경 변수 목록 | YAML |
 | [`docs`](docs) | 그림과 문서 | |
@@ -36,7 +36,7 @@
      -e GITHUB_APP_ID=123456 -e GITHUB_APP_PRIVATE_KEY_PATH=/path/to/key.pem \
      -- npx -y simple-hackathon-ops-mcp@0.1.0
    ```
-   0.2.0부터 서버는 런타임 의존성이 없는 파일 하나라서 `npx`가 tarball 하나만 받습니다. 0.1.0은 그 전 방식의 빌드라 런타임 의존성 8개를 함께 설치합니다. 예시처럼 정확한 버전을 적어 고정하기를 권합니다([버전 고정](packages/mcp#1-nodejs-2213-이상)).
+   다음 릴리스 0.2.0(아직 출판 전)부터 서버는 런타임 의존성이 없는 파일 하나라서 `npx`가 tarball 하나만 받습니다. main에서 빌드한 서버는 이미 이 파일 하나입니다. 지금 npm에 있는 0.1.0은 그 전 방식의 빌드라 런타임 의존성 8개를 함께 설치합니다. 예시처럼 정확한 버전을 적어 고정하기를 권합니다([버전 고정](packages/mcp#1-nodejs-2213-이상)).
 3. **운영**: "새 대회 만들어줘, 명단은 이 시트로" → "명단 확인해줘" → "팀 만들고 초대해줘" → "마감 잠가줘"처럼 말합니다. 바뀔 목록을 먼저 보여 주고, 확인한 뒤에만 적용합니다. 자세한 흐름은 [`packages/mcp`](packages/mcp#대회-흐름)에 있습니다.
 
 ## 지키는 것
@@ -50,7 +50,7 @@
 
 ```bash
 npm install          # 저장소 루트에서 (npm workspaces)
-npm test             # core 193개 + MCP 66개 + 폼 17개 테스트
+npm test             # core 224개 + MCP 66개 + 폼 17개 테스트
 npm run typecheck
 npm run build
 npm run smoke        # 빌드된 CLI로 예제를 검사·빌드하고, MCP 서버 번들을 실제 MCP 클라이언트로 띄워 확인
@@ -65,7 +65,7 @@ npm run smoke        # 빌드된 CLI로 예제를 검사·빌드하고, MCP 서�
 │   └── forms/      신청 페이지: site/ (GitHub Pages) + apps-script/ (Apps Script)
 ├── examples/       설정 예제 (profile + event, 값은 가짜)
 ├── config/         설정 양식 (event.example.yaml, app-policy.yaml, …)
-├── docs/           그림
+├── docs/           사양·설계 문서와 그림 (SPEC.md, design/core-engines.md, images/)
 └── workspace/      내 대회 설정과 기록 (git 제외)
 ```
 
