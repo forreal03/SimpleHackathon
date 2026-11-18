@@ -15,9 +15,9 @@ npm run typecheck
 
 ## 커밋 규칙
 
-규칙의 기준은 `docs/SPEC.md` 18.5입니다. `npm install`이 저장소의 git hook(`.githooks/`)을 켜서, 아래를 커밋과 push 때마다 검사합니다.
+규칙의 기준은 `docs/SPEC.md` 18.5입니다. `npm install`이 저장소의 git hook(`.githooks/`)을 켜서 아래를 커밋과 push 때마다 검사합니다.
 
-- 커밋 메시지의 첫 줄은 `영역: 요약` 꼴입니다. 영역은 `core`, `mcp`, `forms`, `site`, `backend`, `docs`, `examples`, `ci`, `build`, `test`, `chore`, `release` 가운데 하나이고, 요구사항 ID가 있으면 같이 적습니다(예: `core: DIV-3 팀 정량자 추가`). `영역(범위): 요약`(범위는 영문 소문자·숫자·`-`)과 영역 없이 `요구사항 ID: 요약`(예: `DIV-3: 팀 정량자 추가`)도 됩니다. git이 만드는 merge, revert, `fixup!`·`squash!`·`amend!` 커밋은 첫 줄을 검사하지 않습니다.
+- 커밋 메시지의 첫 줄은 `영역: 요약` 꼴입니다. 영역은 `core`, `mcp`, `forms`, `site`, `backend`, `docs`, `examples`, `ci`, `build`, `test`, `chore`, `release` 가운데 하나입니다. 요구사항 ID가 있으면 같이 적습니다(예: `core: DIV-3 팀 정량자 추가`). `영역(범위): 요약`(범위는 영문 소문자·숫자·`-`)과 영역 없이 `요구사항 ID: 요약`(예: `DIV-3: 팀 정량자 추가`)도 됩니다. git이 만드는 merge, revert, `fixup!`·`squash!`·`amend!` 커밋은 첫 줄을 검사하지 않습니다.
 - 첫 줄 다음에는 빈 줄을 두고 본문을 씁니다. 메시지에 이메일 주소를 넣지 않습니다. noreply 주소(`noreply@anthropic.com`, `…@users.noreply.github.com`)와 `example.com` 같은 예시 도메인만 예외입니다.
 - Claude Code 안에서(`CLAUDECODE=1`) 만든 커밋은 마지막 문단에 `Co-Authored-By: Claude … <noreply@anthropic.com>`가 없으면 막힙니다.
 - push 전에 `npm run typecheck`, `npm test`, `npm run build`, `npm run smoke`가 통과해야 합니다(`.githooks/pre-push`). 검사는 작업 트리에서 돌므로, push할 커밋을 체크아웃하고 커밋하지 않은 변경이 없을 때만 push가 됩니다.

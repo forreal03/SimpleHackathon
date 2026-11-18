@@ -2,18 +2,18 @@
 
 [SimpleHackathon-ops](https://github.com/forreal03/SimpleHackathon)의 MCP 서버입니다.
 해커톤을 GitHub에서 운영할 때 반복되는 일을 Claude 같은 MCP 클라이언트에게 말로 시킵니다.
-참가 신청은 같은 저장소의 [신청 폼](../forms)이 받고, 이 서버는 그 결과(구글 시트 또는 로컬 CSV)를 읽어 GitHub org를 관리합니다.
+참가 신청은 같은 저장소의 [신청 폼](../forms)이 받고 이 서버는 그 결과(구글 시트 또는 로컬 CSV)를 읽어 GitHub org를 관리합니다.
 
-- 명단의 팀 배정을 읽어 **GitHub Team을 만들고 참가자를 초대·배정**하고, **조장은 팀 maintainer**로 둡니다.
-- 팀마다 **트랙별 템플릿으로 private repo**를 만들고, 그 팀에만 쓰기 권한을 줍니다.
-- 멘토·심사위원에게 **담당 팀 repo만 읽기 전용**으로 열어 주고, "모든 팀 보기"는 토글로 켜고 끕니다(private repo만).
-- 참가자가 요청한 **third-party GitHub App을 권한 기준으로 판정**합니다. 요청은 GitHub 알림 메일로 받습니다.
-- 마감 때 **전체 또는 트랙별로 잠그고**(권한을 저장해 두었다가 잠금 풀기로 그대로 복원), 제출 태그를 남깁니다.
-- **서버 기준 push 기록**으로 마감 이후 push, force push, 대회 전 작업을 짚어 줍니다.
-- **public 전환 전에 비밀 파일과 README**를 점검합니다.
-- 대회가 끝나면 로컬에 남은 **개인정보를 지웁니다**.
+- 명단의 팀 배정을 읽어 GitHub Team을 만들고 참가자를 초대·배정합니다. 조장은 팀 maintainer로 둡니다.
+- 팀마다 트랙별 템플릿으로 private repo를 만들고 그 팀에만 쓰기 권한을 줍니다.
+- 멘토·심사위원에게 담당 팀 repo만 읽기 전용으로 열어 주고 "모든 팀 보기"는 토글로 켜고 끕니다(private repo만).
+- 참가자가 요청한 third-party GitHub App을 권한 기준으로 판정합니다. 요청은 GitHub 알림 메일로 받습니다.
+- 마감 때 전체 또는 트랙별로 잠그고(권한을 저장해 두었다가 잠금 풀기로 그대로 복원) 제출 태그를 남깁니다.
+- 서버 기준 push 기록으로 마감 이후 push, force push, 대회 전 작업을 짚어 줍니다.
+- public 전환 전에 비밀 파일과 README를 점검합니다.
+- 대회가 끝나면 로컬에 남은 개인정보를 지웁니다.
 
-대회마다 바뀌는 값은 작업 폴더(`HACKATHON_OPS_HOME`)의 `events/<대회>/event.yaml` 하나에 있고, 코드는 대회마다 고치지 않습니다.
+대회마다 바뀌는 값은 작업 폴더(`HACKATHON_OPS_HOME`)의 `events/<대회>/event.yaml` 하나에 있고 코드는 대회마다 고치지 않습니다.
 처음 사용한 대회는 [ENDPoinT 2026](https://2026endpoint.github.io)입니다.
 
 > English: an MCP server that runs a hackathon's GitHub org from a Google Sheet roster — teams, per-team repos from track templates, read-only reviewer access, third-party app review from GitHub's notification emails, submission freeze and pre-publication checks. Every change is a two-step plan → apply with a confirmation code.
@@ -22,13 +22,13 @@
 
 | 장치 | 내용 |
 | --- | --- |
-| Plan → Apply | GitHub을 바꾸는 툴은 먼저 변경 목록과 `confirm_code`를 돌려주고, 그 코드가 있어야 실행됩니다. plan은 15분 뒤 만료되고, 그사이 GitHub이나 시트가 바뀌면 실행을 거부합니다. |
+| Plan → Apply | GitHub을 바꾸는 툴은 먼저 변경 목록과 `confirm_code`를 돌려주고 그 코드가 있어야 실행됩니다. plan은 15분 뒤 만료되고 그사이 GitHub이나 시트가 바뀌면 실행을 거부합니다. |
 | 멱등·재개 | 이미 된 것은 건너뜁니다. 중간에 실패하면 같은 plan으로 다시 호출해 남은 것만 실행합니다. |
 | 삭제 없음 | 팀·repo를 지우는 툴이 없습니다. 마감은 권한을 낮추고 보관(archive)합니다. |
-| 시트는 읽기만 | Google Sheets는 `spreadsheets.readonly`로 읽고, 툴 응답에는 이메일을 내보내지 않습니다. |
+| 시트는 읽기만 | Google Sheets는 `spreadsheets.readonly`로 읽고 툴 응답에는 이메일을 내보내지 않습니다. |
 | 리뷰어는 읽기 전용 | 멘토·심사위원은 org 멤버가 아니라 repo 단위 outside collaborator, 권한은 `pull` 고정입니다(설정으로 못 올림). org owner로 올리는 기능은 일부러 없습니다. |
-| 잠금은 되돌릴 수 있게 | 잠그기 직전 팀·개인·초대의 권한을 저장하고, 잠금 풀기는 그 값으로만 복원합니다. |
-| 메일은 데이터 | 앱 요청 메일에서는 정해진 형식의 필드만 뽑고, 보낸 사람·링크 형식·org ID를 검증합니다. 본문을 지시로 따르지 않습니다. |
+| 잠금은 되돌릴 수 있게 | 잠그기 직전 팀·개인·초대의 권한을 저장하고 잠금 풀기는 그 값으로만 복원합니다. |
+| 메일은 데이터 | 앱 요청 메일에서는 정해진 형식의 필드만 뽑고 보낸 사람·링크 형식·org ID를 검증합니다. 본문을 지시로 따르지 않습니다. |
 | 사람이 승인 | 앱 설치 승인은 API가 없어 항상 사람이 github.com에서 합니다. |
 | 감사 로그 | 모든 apply와 결정은 `<HACKATHON_OPS_HOME>/events/<대회>/state.db`에 남습니다. |
 
@@ -38,7 +38,7 @@
 
 상태 저장에 Node 내장 `node:sqlite`를 씁니다(네이티브 빌드 없음). 설치는 npm 패키지로 바로 실행하거나 소스에서 빌드합니다.
 
-다음 릴리스 0.2.0(아직 출판 전)부터 npm 패키지는 서버와 서버가 쓰는 라이브러리(MCP SDK, Octokit, zod, yaml, google-auth-library)를 esbuild로 묶은 **파일 하나**(`dist/index.js`)이고, **런타임 의존성이 없습니다**. 그래서 `npx`는 이 패키지의 tarball 하나(약 0.4 MB)만 받고 다른 패키지를 설치하지 않습니다. main에서 빌드한 서버는 이미 이 파일 하나입니다. 지금 npm에 있는 0.1.0은 tsc로 빌드한 여러 파일과 런타임 의존성 8개로 된 그 전 방식이라, `npx`가 의존 패키지도 함께 설치합니다. 번들에 들어간 라이브러리 각각의 라이선스 전문은 `THIRD_PARTY_LICENSES`에, 이름·버전·라이선스 목록은 CycloneDX SBOM(`dist/sbom.cdx.json`)에 있습니다.
+다음 릴리스 0.2.0(아직 출판 전)부터 npm 패키지는 파일 하나(`dist/index.js`)이고 런타임 의존성이 없습니다. 이 파일에는 서버와 서버가 쓰는 라이브러리(MCP SDK, Octokit, zod, yaml, google-auth-library)가 esbuild로 묶여 있습니다. 그래서 `npx`는 이 패키지의 tarball 하나(약 0.4 MB)만 받고 다른 패키지를 설치하지 않습니다. main에서 빌드한 서버는 이미 이 파일 하나입니다. 지금 npm에 있는 0.1.0은 그 전 방식입니다. tsc로 빌드한 여러 파일과 런타임 의존성 8개로 되어 있어 `npx`가 의존 패키지도 함께 설치합니다. 번들에 들어간 라이브러리 각각의 라이선스 전문은 `THIRD_PARTY_LICENSES`에, 이름·버전·라이선스 목록은 CycloneDX SBOM(`dist/sbom.cdx.json`)에 있습니다.
 
 ```bash
 # npm 패키지로 (MCP 클라이언트 설정에 command: npx, args: [-y, simple-hackathon-ops-mcp@0.1.0])
@@ -49,8 +49,8 @@ git clone https://github.com/forreal03/SimpleHackathon.git && cd SimpleHackathon
 npm install && npm run build      # packages/mcp/dist/index.js (번들 파일 하나)
 ```
 
-**버전 고정**: MCP 클라이언트 설정에는 `simple-hackathon-ops-mcp@0.1.0`처럼 **정확한 버전**을 적기를 권합니다. 버전을 적지 않으면 npx가 실행할 때 최신 버전을 받아 오므로, 확인하지 않은 새 버전이 대회 중에 그대로 돌 수 있습니다. 새 버전으로 올릴 때는 릴리스 노트를 확인하고 숫자를 바꿉니다.
-번들 안 라이브러리는 설치한 쪽의 `npm audit`에 보이지 않습니다. 그래서 이 저장소의 CI가 push마다, 그리고 매주 한 번 번들에 든 라이브러리의 보안 권고를 확인합니다(`scripts/audit-bundle.mjs`. GitHub는 60일 동안 활동이 없는 공개 저장소의 예약 실행을 멈춥니다). Dependabot은 `package.json`에 적은 직접 의존성의 새 버전을 올리고, 번들 안의 간접 의존성에 대한 보안 수정 PR은 저장소 설정의 Dependabot security updates가 켜져 있을 때 올립니다. 권고가 나오면 다시 빌드해 새 버전을 냅니다. GitHub Actions의 trusted publishing으로 출판한 판에는 빌드 출처 증명(provenance)이 붙고, 설치한 폴더에서 `npm audit signatures`로 확인할 수 있습니다(0.2.0부터 예정, SPEC Q5).
+**버전 고정**: MCP 클라이언트 설정에는 `simple-hackathon-ops-mcp@0.1.0`처럼 정확한 버전을 적기를 권합니다. 버전을 적지 않으면 npx가 실행할 때 최신 버전을 받아 오므로, 확인하지 않은 새 버전이 대회 중에 그대로 돌 수 있습니다. 새 버전으로 올릴 때는 릴리스 노트를 확인하고 숫자를 바꿉니다.
+번들 안 라이브러리는 설치한 쪽의 `npm audit`에 보이지 않습니다. 그래서 이 저장소의 CI가 push마다, 그리고 매주 한 번 번들에 든 라이브러리의 보안 권고를 확인합니다(`scripts/audit-bundle.mjs`. GitHub는 60일 동안 활동이 없는 공개 저장소의 예약 실행을 멈춥니다). Dependabot은 `package.json`에 적은 직접 의존성의 새 버전을 올리고 번들 안의 간접 의존성에 대한 보안 수정 PR은 저장소 설정의 Dependabot security updates가 켜져 있을 때 올립니다. 권고가 나오면 다시 빌드해 새 버전을 냅니다. GitHub Actions의 trusted publishing으로 출판한 판에는 빌드 출처 증명(provenance)이 붙고 설치한 폴더에서 `npm audit signatures`로 확인할 수 있습니다(0.2.0부터 예정, SPEC Q5).
 
 **작업 폴더**: 대회 설정과 기록을 둘 폴더를 하나 정해 `HACKATHON_OPS_HOME`으로 지정합니다(예: `~/hackathon-ops`).
 소스에서 쓸 때는 저장소의 `workspace/`(git 제외)를 쓰면 됩니다.
@@ -70,17 +70,17 @@ GitHub → Settings → Developer settings → GitHub Apps → New GitHub App
   | Repository → Contents | Read and write | 제출 태그, README·파일 목록·커밋 읽기 |
   | Repository → Metadata | Read-only | 기본 |
 
-- Private key를 만들어 안전한 곳에 저장하고, App ID를 적어 둡니다.
+- Private key를 만들어 안전한 곳에 저장하고 App ID를 적어 둡니다.
 - 대회 org에 설치합니다. 이 앱은 모든 repo를 관리해야 하므로 **All repositories**로 설치합니다. 이 앱 자신은 앱 정책 점검에서 빠집니다.
 
 **어디에 만드나?** 비공개(private) GitHub App은 그 앱을 소유한 계정에만 설치할 수 있습니다. 그래서 둘 중 하나를 고릅니다.
 
-- 대회 org 안에서 만든다(org Settings → Developer settings → GitHub Apps). 대회마다 새로 만들지만 범위가 가장 좁습니다.
-- 개인 계정에 하나 만들고 **public**으로 둔다. 여러 대회 org에 같은 앱을 설치할 수 있습니다. 다른 사람이 설치해도 private key 없이는 아무것도 할 수 없습니다.
+- 대회 org 안에서 만듭니다(org Settings → Developer settings → GitHub Apps). 대회마다 새로 만들지만 범위가 가장 좁습니다.
+- 개인 계정에 하나 만들고 public으로 둡니다. 여러 대회 org에 같은 앱을 설치할 수 있습니다. 다른 사람이 설치해도 private key 없이는 아무것도 할 수 없습니다.
 
-MCP 서버 자체는 org에 등록하지 않습니다. 서버는 운영진 PC에서 돌고(아래 4번), org에는 이 GitHub App만 설치합니다.
+MCP 서버 자체는 org에 등록하지 않습니다. 서버는 운영진 PC에서 돌고(아래 4번) org에는 이 GitHub App만 설치합니다.
 
-시험해 볼 때는 GitHub App 대신 `GITHUB_TOKEN`(테스트 org의 owner 토큰)도 됩니다. GitHub CLI에 로그인돼 있다면 `HACKATHON_OPS_GITHUB_FROM_GH=1`로 `gh auth token`을 빌려 쓸 수 있어, 설정 파일에 토큰을 적지 않아도 됩니다.
+시험해 볼 때는 GitHub App 대신 `GITHUB_TOKEN`(테스트 org의 owner 토큰)도 됩니다. GitHub CLI에 로그인돼 있다면 `HACKATHON_OPS_GITHUB_FROM_GH=1`로 `gh auth token`을 빌려 쓸 수 있어 설정 파일에 토큰을 적지 않아도 됩니다.
 
 ### 3. 명단: 로컬 CSV 또는 구글 시트
 
@@ -91,12 +91,12 @@ MCP 서버 자체는 org에 등록하지 않습니다. 서버는 운영진 PC에
 | `local` | 명단을 파일로 받았거나 클라우드 설정 없이 쓰고 싶을 때 | `roster_source_set(local)`이 대회 폴더에 헤더가 들어간 `participants.csv`, `assignment.csv`를 만들어 줍니다. 채우기만 하면 됩니다. |
 | `google_sheets` | [신청 폼](../forms)이 쓰는 시트를 바로 읽을 때 | 아래 Google 인증 |
 
-`event.yaml`의 `roster.spreadsheet`에 Drive나 브라우저에서 복사한 **시트 링크**를 그대로 넣습니다.
-`roster_sources` 툴이 그 시트의 탭과 열을 읽어, 설정과 무엇이 다른지와 누구에게 공유해야 하는지 알려 줍니다.
+`event.yaml`의 `roster.spreadsheet`에 Drive나 브라우저에서 복사한 시트 링크를 그대로 넣습니다.
+`roster_sources` 툴이 그 시트의 탭과 열을 읽어 설정과 무엇이 다른지와 누구에게 공유해야 하는지 알려 줍니다.
 
 서버가 시트를 읽는 방법은 둘 중 하나입니다(둘 다 읽기 전용 `spreadsheets.readonly`).
 
-- **서비스 계정(권장)**: Google Cloud 프로젝트에서 **Google Sheets API**를 켜고 서비스 계정 JSON 키를 받아 `GOOGLE_APPLICATION_CREDENTIALS`에 지정합니다. 시트를 그 서비스 계정 이메일(`roster_sources`가 알려 줌)에 **뷰어**로 공유합니다.
+- **서비스 계정(권장)**: Google Cloud 프로젝트에서 Google Sheets API를 켜고 서비스 계정 JSON 키를 받아 `GOOGLE_APPLICATION_CREDENTIALS`에 지정합니다. 시트를 그 서비스 계정 이메일(`roster_sources`가 알려 줌)에 뷰어로 공유합니다.
 - **내 구글 계정**: gcloud CLI로 한 번 로그인하면 공유 없이 내가 열 수 있는 시트를 읽습니다.
 
   ```bash
@@ -159,7 +159,7 @@ claude mcp add simple-hackathon-ops --scope user \
 | `tracks` | 트랙 ID, 템플릿 repo, 시트에 적히는 별칭(`해커톤`, `구현과제`), 트랙에 속한 팀 번호(`teams: ["01-10"]`), 트랙별 마감(`freeze_at`) |
 | `repo` | 공개 범위, 팀·조장 권한, ruleset, topics, 공개 전 확인할 README 섹션 |
 | `reviewers` | 멘토·심사위원 권한 만료 시각(사람은 `reviewer_set` 툴로 등록) |
-| `schedule` | 시작 시각, **준비 기간**(켜기/끄기 + 시작일), **마감**(켜기/끄기 + 시각). 트랙마다 마감을 따로 켜고 끄거나 시각을 바꿀 수 있습니다. `schedule_set` 툴로 바꾸면 이 파일에 저장됩니다. |
+| `schedule` | 시작 시각, 준비 기간(켜기/끄기 + 시작일), 마감(켜기/끄기 + 시각). 트랙마다 마감을 따로 켜고 끄거나 시각을 바꿀 수 있습니다. `schedule_set` 툴로 바꾸면 이 파일에 저장됩니다. |
 
 앱 정책은 모든 대회가 같이 쓰는 `<HACKATHON_OPS_HOME>/policies/app-policy.yaml`입니다(처음 `event_init` 때 [config/app-policy.yaml](../../config/app-policy.yaml)에서 복사).
 
@@ -216,7 +216,7 @@ GitHub에는 org에 들어온 앱 설치 요청을 읽는 API가 없습니다. �
 
 Gmail 커넥터가 연결된 클라이언트에서 "앱 요청 확인해줘"라고 하면 Claude가
 `from:noreply@github.com subject:"Request to install"` 메일을 찾아 원문을 `app_requests_ingest`에 넘깁니다.
-서버는 메일 권한을 갖지 않습니다. 메일함 전체 읽기 권한을 서버에 주지 않기 위해서입니다.
+서버에는 메일 권한이 없습니다. 메일함 전체 읽기 권한을 서버에 주지 않기 위해서입니다.
 
 판정 기준(가장 위험한 권한 하나로 결정):
 
@@ -233,11 +233,11 @@ Gmail 커넥터가 연결된 클라이언트에서 "앱 요청 확인해줘"라�
 
 - **2FA 강제**: GitHub API로는 켜고 끌 수 없어 사람이 설정 화면에서 바꿉니다. 켜는 순간 2FA가 없는 멤버와 협업자는 org에서 **빠집니다**. `org_settings_plan`에 `require_two_factor: true`를 주면 빠질 사람 목록과 설정 링크를 보여 줍니다. 참가자를 초대하기 전에 정하세요.
 - **Rulesets**: 무료 org의 private repo에는 ruleset을 걸 수 없습니다. 이 경우 자동으로 건너뛰고 경고만 남깁니다.
-- **잠금의 한계**: org owner는 GitHub 규칙상 모든 repo에 admin이라 잠가도 push할 수 있고, 설치된 앱도 push할 수 있습니다. 제출 태그가 마감 시점의 코드를 표시하고, 완전히 막으려면 보관(archive)합니다.
-- **잠금 대상 찾기**: 잠금·공개·활동 점검·멘토 권한은 명단 없이 `repo.name_pattern`(예: `team{team_no}`)으로 GitHub에서 팀 repo를 찾고, 트랙은 `tracks.<트랙>.teams` 범위로 정합니다.
-- **준비 기간과 마감 토글**: 준비 기간을 켜면 `prep_from`부터 시작 전까지의 커밋은 정상으로 보고, 그보다 이른 커밋만 짚습니다(시작일 없이 켜면 시작 전 커밋 전부 허용). 마감을 끄면 그 트랙은 마감 이후 push를 판정하지 않지만, 잠금은 그대로 할 수 있습니다. 마감 전에 잠그면 경고가 나옵니다.
-- **커밋 시각과 push 시각**: 커밋 시각은 커밋한 사람이 정할 수 있어 위조가 가능하지만, `repos_activity`의 push 기록은 GitHub 서버 시각입니다. 둘 다 판정이 아니라 심사위원이 볼 곳을 짚어 주는 참고 자료입니다.
-- **멘토·심사위원과 public repo**: public repo는 누구나 읽을 수 있어 권한을 추가하지 않고, 이미 준 권한도 그대로 둡니다.
+- **잠금의 한계**: org owner는 GitHub 규칙상 모든 repo에 admin이라 잠가도 push할 수 있고 설치된 앱도 push할 수 있습니다. 제출 태그가 마감 시점의 코드를 표시합니다. 완전히 막으려면 보관(archive)합니다.
+- **잠금 대상 찾기**: 잠금·공개·활동 점검·멘토 권한은 명단 없이 `repo.name_pattern`(예: `team{team_no}`)으로 GitHub에서 팀 repo를 찾고 트랙은 `tracks.<트랙>.teams` 범위로 정합니다.
+- **준비 기간과 마감 토글**: 준비 기간을 켜면 `prep_from`부터 시작 전까지의 커밋은 정상으로 보고 그보다 이른 커밋만 짚습니다(시작일 없이 켜면 시작 전 커밋 전부 허용). 마감을 끄면 그 트랙은 마감 이후 push를 판정하지 않지만 잠금은 그대로 할 수 있습니다. 마감 전에 잠그면 경고가 나옵니다.
+- **커밋 시각과 push 시각**: 커밋 시각은 커밋한 사람이 정할 수 있어 위조가 가능하지만 `repos_activity`의 push 기록은 GitHub 서버 시각입니다. 둘 다 판정이 아니라 심사위원이 볼 곳을 짚어 주는 참고 자료입니다.
+- **멘토·심사위원과 public repo**: public repo는 누구나 읽을 수 있어 권한을 추가하지 않고 이미 준 권한도 그대로 둡니다.
 - **public 전환**: 공개된 동안 누가 clone·fork한 것은 다시 private으로 바꿔도 회수되지 않습니다. 참가자에게 미리 알리세요.
 
 ## 개발
