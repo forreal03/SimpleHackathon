@@ -1,6 +1,6 @@
 # simple-hackathon-ops-mcp
 
-[SimpleHackathon-ops](https://github.com/forreal03/SimpleHackathon-ops-mcp)의 MCP 서버입니다.
+[SimpleHackathon-ops](https://github.com/forreal03/SimpleHackathon)의 MCP 서버입니다.
 해커톤을 GitHub에서 운영할 때 반복되는 일을 Claude 같은 MCP 클라이언트에게 말로 시킵니다.
 참가 신청은 같은 저장소의 [신청 폼](../forms)이 받고, 이 서버는 그 결과(구글 시트 또는 로컬 CSV)를 읽어 GitHub org를 관리합니다.
 
@@ -45,7 +45,7 @@
 npx -y simple-hackathon-ops-mcp@0.1.0
 
 # 소스에서
-git clone https://github.com/forreal03/SimpleHackathon-ops-mcp.git && cd SimpleHackathon-ops-mcp
+git clone https://github.com/forreal03/SimpleHackathon.git && cd SimpleHackathon
 npm install && npm run build      # packages/mcp/dist/index.js (번들 파일 하나)
 ```
 

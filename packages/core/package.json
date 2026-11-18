@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/forreal03/SimpleHackathon-ops-mcp.git",
+    "url": "git+https://github.com/forreal03/SimpleHackathon.git",
     "directory": "packages/core"
   },
   "engines": {

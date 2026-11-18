@@ -37,12 +37,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/forreal03/SimpleHackathon-ops-mcp.git",
+    "url": "git+https://github.com/forreal03/SimpleHackathon.git",
     "directory": "packages/mcp"
   },
-  "homepage": "https://github.com/forreal03/SimpleHackathon-ops-mcp#readme",
+  "homepage": "https://github.com/forreal03/SimpleHackathon#readme",
   "bugs": {
-    "url": "https://github.com/forreal03/SimpleHackathon-ops-mcp/issues"
+    "url": "https://github.com/forreal03/SimpleHackathon/issues"
   },
   "engines": {
     "node": ">=22.13"
