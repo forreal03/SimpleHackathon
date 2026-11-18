@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | 상태 | **초안 v0.5** (검토 중. core 엔진 1차 구현은 진행됨, 7.6 참고) |
-| 작성일 | 2026-11-17 (2026-11-18 갱신: 19장 소유자 결정 Q2·Q8 반영(11.5 테마와 SITE-11 포함)과 그에 맞춘 1.5·4.2의 꾸미기 목록(글꼴), Q1·Q4·Q5 설명 보강(8.7의 U12 포함), core 구현 계약서 검토에 따른 2장, 5장부터 7장까지, 11장부터 15장까지, 17장의 문서 수정, 열린 질문 Q13·Q14·Q15 추가, M1 단일 파일 번들 반영(3.2와 13.3의 실측값과 source map을 싣지 않는 결정, 13.4의 npm 번들 크기 예산, 17장의 지금 상태), GitHub에서 취소선으로 보이던 물결표 범위 표기 정리. 같은 날 오후: 문서 방향을 19.2에 기록하고 5.5·18.1·18.4·REL-10을 그에 맞춤, 다시 읽으며 찾은 어긋남 정리(MCP-1과 LEAN-5, GH 표와 ADD-13, SET-9의 Q9 표시, V9를 뺀 규칙 수, D3 시점, U 항목의 실험 시점, 15.4의 Q1 표시, NG2·REL-12·17장의 Q10·Q5 표시, 7.6과 Q15, 식과 가산점, 6.4의 심각도, 4.1·8.2·8.3·10.5·12.1·13.2·16·19.1·19.3의 문구, 11장의 U26·꾸미기 범위·CI 가드, 3.2의 측정값 설명, 5분 요약의 M1 상태). 그 뒤 소유자 답에 따라 사이트 문구를 결정 반영 대상에 더하고(19.2, 5분 요약·10장·10.3·10.4 함께), 맡겨진 U12 대안과 Node 없는 PC의 처리를 19.3에 정하고(8.2·8.4·8.7·9.4·PROV-1·Q1·Q4 함께), 18.5의 진행 방식을 git hook·CI·루트 `CLAUDE.md`로 검사하게 함. 저장소 이름을 `SimpleHackathon`으로 바꿈(Q6 해결, 19.2·19.1·Q5 함께)) |
+| 작성일 | 2026-11-17 (2026-11-18 갱신: 19장 소유자 결정 Q2·Q8 반영(11.5 테마와 SITE-11 포함)과 그에 맞춘 1.5·4.2의 꾸미기 목록(글꼴), Q1·Q4·Q5 설명 보강(8.7의 U12 포함), core 구현 계약서 검토에 따른 2장, 5장부터 7장까지, 11장부터 15장까지, 17장의 문서 수정, 열린 질문 Q13·Q14·Q15 추가, M1 단일 파일 번들 반영(3.2와 13.3의 실측값과 source map을 싣지 않는 결정, 13.4의 npm 번들 크기 예산, 17장의 지금 상태), GitHub에서 취소선으로 보이던 물결표 범위 표기 정리. 같은 날 오후: 문서 방향을 19.2에 기록하고 5.5·18.1·18.4·REL-10을 그에 맞춤, 다시 읽으며 찾은 어긋남 정리(MCP-1과 LEAN-5, GH 표와 ADD-13, SET-9의 Q9 표시, V9를 뺀 규칙 수, D3 시점, U 항목의 실험 시점, 15.4의 Q1 표시, NG2·REL-12·17장의 Q10·Q5 표시, 7.6과 Q15, 식과 가산점, 6.4의 심각도, 4.1·8.2·8.3·10.5·12.1·13.2·16·19.1·19.3의 문구, 11장의 U26·꾸미기 범위·CI 가드, 3.2의 측정값 설명, 5분 요약의 M1 상태). 그 뒤 소유자 답에 따라 사이트 문구를 결정 반영 대상에 더하고(19.2, 5분 요약·10장·10.3·10.4 함께), 맡겨진 U12 대안과 Node 없는 PC의 처리를 19.3에 정하고(8.2·8.4·8.7·9.4·PROV-1·Q1·Q4 함께), 18.5의 진행 방식을 git hook·CI·루트 `CLAUDE.md`로 검사하게 함. 저장소 이름을 `SimpleHackathon`으로 바꿈(Q6 해결, 19.2·19.1·Q5 함께). 0.2.0 출판 준비(release:check, CHANGELOG, 출판 workflow, Dependabot과 번들 감사)를 17장 지금 상태에 적음) |
 | 대상 | 이 저장소(`SimpleHackathon`, 2026-11-18까지 이름은 `SimpleHackathon-ops-mcp`)를 누구나 받아 쓰는 **해커톤 운영 OSS 키트**로 재구성합니다. 특정 대회(ENDPoinT 포함)에 한정되지 않고, 공개 배포를 전제로 합니다. |
 | 근거 | ENDPoinT 2026 운영 경험(첫 번째 reference case), 해커톤 형식·기존 OSS·Google Apps Script·MCP 사양·심사 방식에 대한 1차 자료 조사(2026-11-17), 현재 코드의 측정값. 비공개 자료는 구조만 요약했고 이름·금액·개인정보는 넣지 않았습니다. |
 | 관련 문서 | `docs/design/core-engines.md`(core 엔진 구현 계약서), 조사 보고서(이 문서의 2장·부록 E에 요약) |
@@ -1873,7 +1873,11 @@ CI가 막는 것: 크기 초과(코드줄 수, 사이트의 gzip 크기, npm 번
 | M5 → 0.6.0 | add-on 1차(`popular_vote`, `team_finder`, `upload`, `mail`, `award_show`, `public_status`, `github_ops` 정렬), Tier 2, Claude Code 플러그인과 MCPB, D3 | add-on 계약 테스트, 확정 섹션 |
 | M6 → 1.0.0 | ENDPoinT 재현과 사내형 예제의 실제 리허설, 부하 시험, 보안 점검, Quickstart 문서 | REL-2의 1.0.0 조건 |
 
-**지금 상태(2026-11-18).** core 엔진 1차 구현(M2의 일부)이 먼저 들어갔습니다. 순서가 앞당겨진 이유는 소유자가 요구한 부문·점수·식이 모든 단계의 기반이기 때문입니다. M1의 단일 파일 번들은 2026-11-18에 main에 들어갔습니다. 기존 테스트와 저장소의 smoke(MCP SDK 클라이언트로 도구 32개의 이름과 결과 비교)는 Node 22.13·22.23·24·26에서 통과했습니다(24는 CI와 24.22.3). 빈 폴더에 tarball을 설치해 npm 패키지가 하나만 깔리는지 보고, 설치된 실행 파일을 stdio로 띄워 도구 목록과 도구 호출, 종료를 확인하는 검사도 같은 네 버전(22.13.0, 22.23.5, 24.22.3, 26.13.0)에서 통과했습니다. M1 완료 조건 가운데 MCP Inspector와 Claude Code로 띄워 보는 smoke는 아직 하지 않았습니다. 0.2.0 출판 전에는 서버가 알리는 버전과 `package.json` 버전을 맞추는 검사, Dependabot과 `npm audit`(REL-9), 출판 workflow(REL-12, Q5)가 남아 있습니다. 모든 릴리스가 통과해야 하는 18.4의 `release:check`(REL-5)와, 그 7번이 확인하는 CHANGELOG의 "설정 영향"(REL-3)도 아직 저장소에 없습니다. 각 릴리스의 npm publish는 소유자 승인 뒤에만 합니다.
+**지금 상태(2026-11-18).** core 엔진 1차 구현(M2의 일부)이 먼저 들어갔습니다. 순서가 앞당겨진 이유는 소유자가 요구한 부문·점수·식이 모든 단계의 기반이기 때문입니다. M1의 단일 파일 번들은 2026-11-18에 main에 들어갔습니다. 기존 테스트와 저장소의 smoke(MCP SDK 클라이언트로 도구 32개의 이름과 결과 비교)는 Node 22.13·22.23·24·26에서 통과했습니다(24는 CI와 24.22.3). 빈 폴더에 tarball을 설치해 npm 패키지가 하나만 깔리는지 보고, 설치된 실행 파일을 stdio로 띄워 도구 목록과 도구 호출, 종료를 확인하는 검사도 같은 네 버전(22.13.0, 22.23.5, 24.22.3, 26.13.0)에서 통과했습니다. M1 완료 조건 가운데 MCP Inspector와 Claude Code로 띄워 보는 smoke는 아직 하지 않았습니다. 0.2.0 출판 준비는 2026-11-18에 들어갔습니다. 서버가 알리는 버전은 이제 `package.json`에서 읽고, smoke가 두 값이 같은지 확인합니다. CI의 감사(REL-9, `audit-bundle.mjs`)는 번들에 든 라이브러리에 moderate 이상의 권고가 나오면 실패하고, 개발 도구의 권고나 번들의 low 권고는 경고로만 남깁니다. 그날 기준으로 테스트 도구 쪽에 high 권고가 하나 있었고(picomatch의 GHSA-fc5q-39xc-vjpf. npm audit는 이것을 picomatch·fdir·tinyglobby·vite·vitest 다섯 패키지의 취약점으로 셉니다), 번들의 56개 패키지에는 권고가 없었습니다. Dependabot은 매주 직접 의존성의 새 버전을 올립니다.
+
+출판 workflow(`release.yml`, REL-12)는 `vX.Y.Z` 태그가 올라오면 돕니다. 게시 권한이 없는 job이 `release:check`를 통과시키고 tarball을 만들면, 소유자 승인을 받은 job이 의존 코드를 돌리지 않고 그 tarball만 trusted publishing으로 게시합니다. `release:check`(REL-5)는 18.4의 검사를 한 번에 돌리면서 CHANGELOG의 날짜와 "설정 영향"(REL-3)도 봅니다. 코드가 아직 없는 검사는 "아직 없음"으로 표시됩니다. locked invariants 테스트와 13.4의 코드줄 예산은 M2(`budget.test.ts`. 계약서 12장의 v1 측정은 수식 엔진 517/400, 부문 판정 336/200)에서, brand scan과 대회 값 lint는 LEAN-7과 함께, 백엔드 번들 sha256 목록은 M3에서 생깁니다.
+
+출판까지 남은 일에는 사람 손이 필요합니다. MCP Inspector와 Claude Code로 띄워 보는 smoke를 직접 해 봐야 하고, 소유자가 GitHub environment `npm`(Required reviewers에 소유자)을 먼저 만든 뒤 npm trusted publishing을 등록해야 합니다(Q5). 저장소 설정에서 Dependabot alerts와 security updates가 켜져 있는지도 봐야 합니다. 번들의 간접 의존성 48개는 security updates로만 갱신 PR이 오기 때문입니다. 그다음 버전 숫자와 README의 고정 버전, "아직 출판 전"·"예정" 문구, CHANGELOG 날짜를 고치는 출판 커밋을 만들고, 소유자 승인을 받아 태그를 push합니다. 각 릴리스의 npm publish는 소유자 승인 뒤에만 합니다.
 
 **ENDPoinT 파일이 어디로 가는가.**
 
@@ -2083,15 +2087,15 @@ Tier 0 템플릿 시트는 키트가 미리 만들어 두는 원본 Google 시�
 권장은 0.2.0부터 적용하는 것입니다. 소유자가 할 일은 아래와 같고, 소유자만 할 수 있습니다. `npm whoami`는 따로 하지 않아도 됩니다. 패키지 Settings 화면에 들어갈 수 있다는 것 자체가 소유 확인입니다.
 1. 저장소 이름 변경(Q6)을 먼저 정합니다(2026-11-18에 `SimpleHackathon`으로 바꿈). 등록 값(owner, 저장소, workflow 파일 이름)은 대소문자까지 정확히 맞아야 하고, `package.json`의 `repository.url`과도 같아야 합니다. 등록 값은 고칠 수 없고 지우고 다시 만들어야 합니다. npm은 저장할 때 검사하지 않습니다.
 2. npm 계정의 2FA를 켭니다.
-3. npmjs.com → 패키지 Settings → Trusted publishing → GitHub Actions에 아래 값을 넣습니다.
+3. GitHub 저장소에 environment `npm`을 만들고 Required reviewers에 소유자를 넣습니다. 그러면 게시마다 소유자의 승인이 기술적으로 강제됩니다(REL-11). 이 단계를 4번보다 먼저 합니다. environment가 없을 때 태그가 push되면 workflow가 보호 규칙 없는 `npm` environment를 새로 만들어, 4번이 끝나 있으면 승인 없이 게시됩니다.
+4. npmjs.com → 패키지 Settings → Trusted publishing → GitHub Actions에 아래 값을 넣습니다.
    - Organization or user: `forreal03`
    - Repository: `SimpleHackathon`
    - Workflow filename: `release.yml`
    - Environment: `npm`
    - 허용 동작: `npm publish`
 
-   npm 11.15.0 이상이 있으면 `npm trust github`로도 등록할 수 있습니다.
-4. GitHub 저장소에 environment `npm`을 만들고 Required reviewers에 소유자를 넣습니다. 그러면 게시마다 소유자의 승인이 기술적으로 강제됩니다(REL-11).
+   npm 11.15.0 이상이 있으면 `npm trust github simple-hackathon-ops-mcp --file release.yml --repo forreal03/SimpleHackathon --env npm --allow-publish`로도 등록할 수 있습니다.
 5. 첫 trusted publish가 성공하면 Publishing access를 "Require two-factor authentication and disallow tokens"로 바꿉니다.
 
 키트 쪽에서 할 일은 `release.yml`을 만드는 것입니다.

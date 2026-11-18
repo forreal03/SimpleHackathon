@@ -28,6 +28,7 @@ const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}
 const ALLOWED_EMAIL = [
   /^noreply@anthropic\.com$/i,
   /^noreply@github\.com$/i,
+  /^support@github\.com$/i, // Dependabot's "Signed-off-by: dependabot[bot] <support@github.com>"
   /@users\.noreply\.github\.com$/i,
   /@(?:[a-z0-9-]+\.)*example\.[a-z.]+$/i, // example.com and the docs' example.ac.kr
   /\.(?:example|test|invalid)$/i,

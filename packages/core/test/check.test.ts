@@ -305,10 +305,10 @@ describe("V8: secrets", () => {
 
   it("also finds other GitHub tokens, Google OAuth client secrets, quoted private_key keys and PGP keys", () => {
     const lines = [
-      "github: { org: x, token: gho_16C7e42F292c6912E7710c838347Ae178B4a }",
-      "app: ghs_16C7e42F292c6912E7710c838347Ae178B4a",
-      "user: ghu_16C7e42F292c6912E7710c838347Ae178B4a",
-      "refresh: ghr_16C7e42F292c6912E7710c838347Ae178B4a",
+      "github: { org: x, token: gho_16C7e42F292c6912E7710c838347Ae178B4a }", // fake token for the V8 test; secret-scan: allow
+      "app: ghs_16C7e42F292c6912E7710c838347Ae178B4a", // fake token for the V8 test; secret-scan: allow
+      "user: ghu_16C7e42F292c6912E7710c838347Ae178B4a", // fake token for the V8 test; secret-scan: allow
+      "refresh: ghr_16C7e42F292c6912E7710c838347Ae178B4a", // fake token for the V8 test; secret-scan: allow
       "oauth: { client_secret: GOCSPX-abcdefghijklmnopqrstuvwx12 }",
       `repo: { 'private_key': "abc" }`,
       "-----BEGIN PGP PRIVATE KEY BLOCK-----",

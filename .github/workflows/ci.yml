@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly, so a new advisory for a bundled library shows up even without a push (REL-9). In a public
+  # repository GitHub turns this schedule off after 60 days without repository activity; turn the ci
+  # workflow back on in the Actions tab. Dependabot alerts keep working without it.
+  schedule:
+    - cron: '23 4 * * 1'
 
 permissions:
   contents: read
@@ -25,6 +30,9 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run smoke
+      # Fails on a moderate or worse advisory for a library inside the bundle; warns about the rest (REL-9).
+      - if: matrix.node == 24
+        run: node packages/mcp/scripts/audit-bundle.mjs
 
   # Commit message rules from docs/SPEC.md 18.5, for the commits a pull request adds.
   # Direct pushes to main are checked locally by .githooks/commit-msg.

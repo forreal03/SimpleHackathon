@@ -10,6 +10,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PACKAGE_VERSION = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
 // The 0.1.0 tool surface (SPEC 12.4). Change it together with the tools.
 const EXPECTED_TOOLS = 32;
 const EXPECTED_TOOL_NAMES = [
@@ -52,6 +53,10 @@ async function smoke(entry, { cwd, env = process.env, print = () => {} }) {
 
   try {
     await client.connect(transport).catch((err) => expect(false, `server did not start (${err.message})`));
+    // The version the server reports must be the version npm publishes (SPEC 17, 0.2.0 release prep).
+    const reported = client.getServerVersion()?.version;
+    log(`server version: ${reported}`);
+    expect(reported === PACKAGE_VERSION, `server reports version ${reported}, package.json is ${PACKAGE_VERSION}`);
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
     log(`tools (${tools.length}): ${names.join(", ")}`);

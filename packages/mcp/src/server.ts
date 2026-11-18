@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import os from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -19,7 +20,17 @@ import { orgSettingsPlan } from "./plans/orgsettings.js";
 import { describeSchedule, setSchedule } from "./ops/schedule.js";
 import { setRosterSource } from "./ops/rostersource.js";
 
-export const VERSION = "0.1.0";
+/**
+ * The version the server reports, read from package.json so that it cannot drift from the published one.
+ * The file sits one level up from both src/server.ts and the bundle dist/index.js.
+ */
+export const VERSION: string = (() => {
+  try {
+    return String(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
+  } catch {
+    return "0.0.0-unknown"; // no package.json next to the code; scripts/smoke.mjs fails on this
+  }
+})();
 
 const INSTRUCTIONS = `hackathon-ops manages one GitHub organization per hackathon event.
 

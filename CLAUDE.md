@@ -18,6 +18,12 @@
 - CI가 실패하면 다음 작업보다 먼저 고칩니다.
 - hook은 `npm install`이 켭니다. `scripts/install-hooks.mjs`가 이 clone의 git 폴더(`.git/shk-hooks/`)에 `commit-msg`와 `pre-push` wrapper만 만들고 `core.hooksPath`를 그곳으로 둡니다. 다른 이름의 hook은 실행되지 않습니다. clone을 옮기면 `npm install`을 다시 합니다. 기본 PATH에 Node 22.13 이상이 없으면 hook이 멈추므로, 먼저 PATH에 Node를 넣고 커밋하고 push합니다.
 
+## 릴리스
+
+- 출판 전에 `npm run release:check`가 통과해야 합니다(SPEC 18.4, REL-5). npm audit 때문에 네트워크가 필요합니다. "아직 없음"과 "사람이 확인" 항목은 출력에 따로 나옵니다.
+- 출판 커밋에서 함께 바꿀 것은 `packages/mcp/package.json`의 version(`npm version X.Y.Z -w packages/mcp --no-git-tag-version`으로 바꾸면 `package-lock.json`도 함께 바뀝니다), 두 README의 `simple-hackathon-ops-mcp@버전`과 "아직 출판 전"·"예정" 문장(`packages/mcp/README.md`의 provenance 문장 포함), `CHANGELOG.md`의 그 버전 머리(날짜)와 "설정 영향"입니다. README의 고정 버전은 `check-package.mjs`가 package.json과 맞는지 봅니다.
+- 출판은 `vX.Y.Z` 태그 push로 `.github/workflows/release.yml`이 합니다. 태그 push와 출판은 소유자 승인이 필요하고, workflow는 GitHub environment `npm`의 승인을 다시 기다립니다. 이 승인은 environment `npm`이 Required reviewers와 함께 이미 있을 때만 걸립니다. 없으면 GitHub가 보호 규칙 없는 `npm` environment를 새로 만들고 승인 없이 출판하므로, 첫 태그 push 전에 소유자가 만들어 두었는지 확인합니다(SPEC Q5).
+
 ## 소유자 승인이 필요한 일
 
 아래는 소유자가 명시적으로 승인한 뒤에만 합니다(SPEC 18.5, REL-11). 승인은 그 행위 하나에만 유효합니다.

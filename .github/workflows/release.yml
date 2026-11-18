@@ -1,0 +1,66 @@
+name: release
+
+# Publishes simple-hackathon-ops-mcp to npm (SPEC 18.4, REL-12).
+# Starts when a tag vX.Y.Z is pushed; pushing a tag needs the owner's approval (SPEC 18.5).
+# Before the first run (SPEC 19.4 Q5), in this order:
+#   - create the GitHub environment "npm" with the owner as a required reviewer, so every publish waits
+#     for the owner. A run that names a missing environment creates it with no protection rule;
+#   - then register this workflow (file release.yml, environment npm) as a trusted publisher on npmjs.com.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # npm ci, the tests and the build run dependency code, so this job gets no publish rights.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      # Every check of SPEC 18.4, and the tag must name the package version.
+      - run: npm run release:check
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+      - run: |
+          mkdir -p "$RUNNER_TEMP/package"
+          npm pack --workspace packages/mcp --pack-destination "$RUNNER_TEMP/package"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ${{ runner.temp }}/package/*.tgz
+          if-no-files-found: error
+
+  # Only this job can get the npm OIDC token, it waits for the owner's approval after the checks pass,
+  # and it runs no dependency code.
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing (OIDC) and provenance
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later (SPEC 19.4 Q5).
+      - run: npm install --global npm@^11.5.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: package
+      - run: npm publish ./package/*.tgz --provenance

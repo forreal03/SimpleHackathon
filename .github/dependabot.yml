@@ -1,0 +1,30 @@
+# Dependency updates (SPEC REL-9, LEAN-11). The npm package bundles its libraries, so a fix reaches users
+# only through a new release: merge the update, then release (SPEC 13.3).
+# This file sets version updates only, and for npm they cover the dependencies a package.json names:
+# 8 of the 56 packages in the bundle. The other 48 are transitive; their fixes come from Dependabot
+# security updates, which are turned on in Settings > Advanced Security (Dependabot alerts and
+# Dependabot security updates), not here.
+# Commit messages follow the commit rules (SPEC 18.5): "build(deps): ...", "build(deps-dev): ..." and "ci(deps): ...".
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      minor-and-patch:
+        patterns: ['*']
+        # esbuild is 0.x: Dependabot calls 0.28 -> 0.29 a minor update, but npm's ^0.28.2 does not include it.
+        exclude-patterns: ['esbuild']
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope

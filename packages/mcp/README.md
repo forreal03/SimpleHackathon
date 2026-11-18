@@ -50,7 +50,7 @@ npm install && npm run build      # packages/mcp/dist/index.js (번들 파일 �
 ```
 
 **버전 고정**: MCP 클라이언트 설정에는 `simple-hackathon-ops-mcp@0.1.0`처럼 **정확한 버전**을 적기를 권합니다. 버전을 적지 않으면 npx가 실행할 때 최신 버전을 받아 오므로, 확인하지 않은 새 버전이 대회 중에 그대로 돌 수 있습니다. 새 버전으로 올릴 때는 릴리스 노트를 확인하고 숫자를 바꿉니다.
-번들 안 라이브러리는 설치한 쪽의 `npm audit`에 보이지 않습니다. 그 라이브러리에 보안 권고가 나오면 이 저장소에서 다시 빌드해 새 버전을 냅니다.
+번들 안 라이브러리는 설치한 쪽의 `npm audit`에 보이지 않습니다. 그래서 이 저장소의 CI가 push마다, 그리고 매주 한 번 번들에 든 라이브러리의 보안 권고를 확인합니다(`scripts/audit-bundle.mjs`. GitHub는 60일 동안 활동이 없는 공개 저장소의 예약 실행을 멈춥니다). Dependabot은 `package.json`에 적은 직접 의존성의 새 버전을 올리고, 번들 안의 간접 의존성에 대한 보안 수정 PR은 저장소 설정의 Dependabot security updates가 켜져 있을 때 올립니다. 권고가 나오면 다시 빌드해 새 버전을 냅니다. GitHub Actions의 trusted publishing으로 출판한 판에는 빌드 출처 증명(provenance)이 붙고, 설치한 폴더에서 `npm audit signatures`로 확인할 수 있습니다(0.2.0부터 예정, SPEC Q5).
 
 **작업 폴더**: 대회 설정과 기록을 둘 폴더를 하나 정해 `HACKATHON_OPS_HOME`으로 지정합니다(예: `~/hackathon-ops`).
 소스에서 쓸 때는 저장소의 `workspace/`(git 제외)를 쓰면 됩니다.

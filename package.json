@@ -14,7 +14,8 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "smoke": "npm run smoke --workspaces --if-present",
-    "prepare": "node scripts/install-hooks.mjs"
+    "prepare": "node scripts/install-hooks.mjs",
+    "release:check": "node scripts/release-check.mjs"
   },
   "repository": {
     "type": "git",
