@@ -1,0 +1,35 @@
+#!/bin/sh
+# Push rule from docs/SPEC.md 18.5: typecheck, tests, build and smoke must pass locally before a push,
+# for documentation-only changes too. Turned on by `npm install` (scripts/install-hooks.mjs).
+if ! command -v npm >/dev/null 2>&1; then
+  echo "pre-push: Node.js 22.13 이상(npm 포함)이 PATH에 없어 push 전 검사를 하지 못했습니다." >&2
+  exit 1
+fi
+if ! node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 13) ? 0 : 1)'; then
+  echo "pre-push: Node.js 22.13 이상이 필요합니다(지금 $(node --version))." >&2
+  exit 1
+fi
+
+# The checks run on the working tree, so it has to be exactly the commit being pushed.
+head=$(git rev-parse HEAD)
+pushes=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;; # deleting a remote ref
+  esac
+  pushes=1
+  if [ "$(git rev-parse "$local_sha^{commit}")" != "$head" ]; then
+    echo "pre-push: 검사는 체크아웃한 커밋에서 돕니다. $local_ref 을(를) 체크아웃한 뒤 다시 push해 주세요." >&2
+    exit 1
+  fi
+done
+[ "$pushes" = 1 ] || exit 0
+if [ -n "$(git status --porcelain)" ]; then
+  echo "pre-push: 커밋하지 않은 변경이나 git에 넣지 않은 파일이 있어 push할 커밋 그대로 검사할 수 없습니다. 커밋하거나 git stash -u로 치운 뒤 다시 push해 주세요." >&2
+  git status --short >&2
+  exit 1
+fi
+
+echo "pre-push: typecheck → test → build → smoke (SPEC 18.5)"
+npm run typecheck && npm test && npm run build && npm run smoke

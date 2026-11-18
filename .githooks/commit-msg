@@ -1,0 +1,8 @@
+#!/bin/sh
+# Commit message rules from docs/SPEC.md 18.5 (scripts/check-commit-msg.mjs).
+# Turned on by `npm install`, which sets core.hooksPath to .githooks.
+if ! command -v node >/dev/null 2>&1; then
+  echo "commit-msg: Node.js 22.13 이상이 PATH에 없어 커밋 메시지를 검사하지 못했습니다. PATH에 Node를 넣고 다시 커밋해 주세요." >&2
+  exit 1
+fi
+exec node scripts/check-commit-msg.mjs "$1"

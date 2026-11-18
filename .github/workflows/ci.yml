@@ -25,3 +25,28 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run smoke
+
+  # Commit message rules from docs/SPEC.md 18.5, for the commits a pull request adds.
+  # Direct pushes to main are checked locally by .githooks/commit-msg.
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-commit-msg.mjs --range "$BASE_SHA..$HEAD_SHA"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      # A squash merge makes the PR title the first line of the commit on main.
+      - run: |
+          printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/pr-title"
+          GIT_EDITOR=: node scripts/check-commit-msg.mjs "$RUNNER_TEMP/pr-title"
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
